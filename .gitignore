@@ -1,0 +1,5 @@
+# Workspace-only files
+.claude/
+.vscode/
+.frontend-git-local/
+.backend-git-local/
