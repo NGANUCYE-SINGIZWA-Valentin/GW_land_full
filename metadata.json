@@ -1,0 +1,6 @@
+{
+  "name": "GW Land Real Estate Promotion Platform",
+  "description": "Real estate and land listing platform in Rwanda featuring property search, interactive maps, seller management, buyer dashboards, and admin moderation.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

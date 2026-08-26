@@ -1,0 +1,10 @@
+# Robots.txt for GW Homes
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /register
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /seller/
+
+Sitemap: https://gwhomes.rw/sitemap.xml
