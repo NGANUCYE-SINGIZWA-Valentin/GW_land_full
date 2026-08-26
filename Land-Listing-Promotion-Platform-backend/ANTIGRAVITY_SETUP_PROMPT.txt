@@ -1,0 +1,308 @@
+You are setting up and running the GW Land & Construction backend project.
+This is a Node.js + Express + PostgreSQL REST API for a land listing platform
+in Rwanda, built for Getway Connection Ltd.
+
+The project is split across four folders in the workspace:
+- gw-land-backend-step1/  → project foundation + database schema + Rwanda location data
+- gw-land-backend-step2/  → authentication (register, login, JWT, password reset)
+- gw-land-backend-step3/  → listings (create, approval workflow, admin dashboard, image upload)
+- gw-land-backend-step4/  → messaging, locations API, contact form, report listing, sitemap, search filters
+
+YOUR TASK: Read all files across all four folders, merge them into a single working
+project, create the PostgreSQL database from scratch, and get the server running.
+
+════════════════════════════════════════════════════════════
+STEP 1 — UNDERSTAND THE FULL FILE STRUCTURE
+════════════════════════════════════════════════════════════
+
+Read every file in all four step folders before doing anything. The most
+important files are:
+
+  gw-land-backend-step1/db/schema.sql          ← database table definitions
+  gw-land-backend-step1/db/seed_locations.sql  ← Rwanda provinces/districts/sectors
+  gw-land-backend-step4/src/                   ← contains the most complete/final
+                                                   versions of all source files
+
+The step4 folder is the COMPLETE final project. It already contains everything
+from steps 1, 2, and 3 plus the new Step 4 additions. You do NOT need to
+manually merge files from different steps — just use step4 as the source of
+truth for all src/ files.
+
+The only files you need from step1 are:
+  - db/schema.sql
+  - db/seed_locations.sql
+  - db/create-admin.js
+
+════════════════════════════════════════════════════════════
+STEP 2 — SET UP THE PROJECT FOLDER
+════════════════════════════════════════════════════════════
+
+Create a single working folder called gw-land-backend/ (or use step4 directly).
+Make sure it has this structure:
+
+  gw-land-backend/
+  ├── db/
+  │   ├── schema.sql
+  │   ├── seed_locations.sql
+  │   └── create-admin.js
+  ├── src/
+  │   ├── config/db.js
+  │   ├── controllers/
+  │   │   ├── auth.controller.js
+  │   │   ├── listings.controller.js
+  │   │   ├── admin.controller.js
+  │   │   ├── messages.controller.js
+  │   │   ├── locations.controller.js
+  │   │   └── misc.controller.js
+  │   ├── middleware/
+  │   │   ├── auth.middleware.js
+  │   │   ├── role.middleware.js
+  │   │   └── upload.middleware.js
+  │   ├── routes/
+  │   │   ├── auth.routes.js
+  │   │   ├── listings.routes.js
+  │   │   ├── admin.routes.js
+  │   │   ├── messages.routes.js
+  │   │   ├── locations.routes.js
+  │   │   └── misc.routes.js
+  │   ├── utils/
+  │   │   ├── jwt.js
+  │   │   ├── email.js
+  │   │   ├── slug.js
+  │   │   └── notifications.js
+  │   ├── app.js
+  │   └── server.js
+  ├── uploads/
+  │   ├── listings/.gitkeep
+  │   ├── documents/.gitkeep
+  │   └── avatars/.gitkeep
+  ├── .env.example
+  ├── .gitignore
+  └── package.json
+
+════════════════════════════════════════════════════════════
+STEP 3 — CREATE THE POSTGRESQL DATABASE
+════════════════════════════════════════════════════════════
+
+PostgreSQL credentials to use:
+  username: postgres
+  password: 12345
+  database name: gw_land_db
+
+Run these commands to create and populate the database:
+
+  psql -U postgres -c "CREATE DATABASE gw_land_db;"
+  psql -U postgres -d gw_land_db -f db/schema.sql
+  psql -U postgres -d gw_land_db -f db/seed_locations.sql
+
+If the database already exists, drop and recreate it:
+  psql -U postgres -c "DROP DATABASE IF EXISTS gw_land_db;"
+  psql -U postgres -c "CREATE DATABASE gw_land_db;"
+
+After running schema.sql you should see a long list of:
+  CREATE TYPE, CREATE TABLE, CREATE INDEX, CREATE FUNCTION, CREATE TRIGGER
+
+After running seed_locations.sql you should see at the end:
+  INSERT 0 5    ← 5 provinces
+  INSERT 0 30   ← 30 districts
+  INSERT 0 383  ← 383 sectors
+
+════════════════════════════════════════════════════════════
+STEP 4 — CREATE THE .env FILE
+════════════════════════════════════════════════════════════
+
+Create a .env file in the project root with this content:
+
+  PORT=5000
+  NODE_ENV=development
+  DB_HOST=localhost
+  DB_PORT=5432
+  DB_NAME=gw_land_db
+  DB_USER=postgres
+  DB_PASSWORD=12345
+  JWT_SECRET=gwland_super_secret_change_this_in_production_2026
+  JWT_EXPIRES_IN=7d
+  SMTP_HOST=
+  SMTP_PORT=587
+  SMTP_USER=
+  SMTP_PASS=
+  SMTP_FROM=
+  FRONTEND_URL=http://localhost:3000
+
+The SMTP fields can be left blank for now — password reset emails will print
+to the console instead of being sent, which is fine for development.
+
+════════════════════════════════════════════════════════════
+STEP 5 — INSTALL DEPENDENCIES AND START THE SERVER
+════════════════════════════════════════════════════════════
+
+  npm install
+  npm run dev
+
+The server should start and print:
+  ✅ GW Land backend running on http://localhost:5000
+
+════════════════════════════════════════════════════════════
+STEP 6 — VERIFY EVERYTHING IS WORKING
+════════════════════════════════════════════════════════════
+
+Test these URLs — all should return JSON with status 200:
+
+  GET  http://localhost:5000/api/health
+       → { "status": "ok", "message": "GW Land backend is running" }
+
+  GET  http://localhost:5000/api/health/db
+       → { "status": "ok", "db_time": "2026-..." }
+
+  GET  http://localhost:5000/api/locations/provinces
+       → { "provinces": [ { "id":1, "name":"City of Kigali" }, ... ] }
+
+  GET  http://localhost:5000/api/locations/districts?province_id=1
+       → { "districts": [ { "id":1, "name":"Gasabo", ... }, ... ] }
+
+  GET  http://localhost:5000/api/locations/sectors/1
+       → { "sectors": [ { "id":1, "name":"Bumbogo" }, ... ] }
+
+  GET  http://localhost:5000/api/listings
+       → { "listings": [], "page": 1, "total": 0, ... }
+
+  GET  http://localhost:5000/api/sitemap.xml
+       → valid XML with <urlset> tag
+
+════════════════════════════════════════════════════════════
+STEP 7 — CREATE THE FIRST ADMIN ACCOUNT
+════════════════════════════════════════════════════════════
+
+There is no public signup path for admin accounts. Run this once to create one:
+
+  node db/create-admin.js "Admin GW" admin@gwland.com YourStrongPassword123
+
+To create a Sub-Admin:
+  node db/create-admin.js "Sub Admin" subadmin@gwland.com YourStrongPassword123 sub_admin
+
+════════════════════════════════════════════════════════════
+COMPLETE API REFERENCE
+════════════════════════════════════════════════════════════
+
+AUTH (no token required unless marked 🔒)
+  POST   /api/auth/register           → register as buyer or seller
+  POST   /api/auth/login              → login, returns JWT token
+  POST   /api/auth/forgot-password    → sends password reset code to email
+  POST   /api/auth/reset-password     → resets password using the code
+  GET  🔒/api/auth/me                  → get own profile
+  PUT  🔒/api/auth/me                  → update name/phone/whatsapp
+  POST 🔒/api/auth/me/photo            → upload profile photo (multipart)
+  PUT  🔒/api/auth/me/password         → change password (needs current password)
+
+LOCATIONS (all public)
+  GET    /api/locations/provinces              → all 5 provinces
+  GET    /api/locations/districts              → all 30 districts
+  GET    /api/locations/districts?province_id= → districts in one province
+  GET    /api/locations/sectors/:district_id   → sectors for a district
+
+LISTINGS (public browsing, 🔒 for seller actions)
+  GET    /api/listings                         → browse all approved listings
+         ?q=          keyword search (title/description)
+         ?district_id= filter by district
+         ?sector_id=   filter by sector
+         ?min_price=   min price in RWF
+         ?max_price=   max price in RWF
+         ?min_size=    min land size
+         ?max_size=    max land size
+         ?size_unit=   sqm or hectare
+         ?featured=true only featured listings
+         ?page=&limit=  pagination
+  GET    /api/listings/:slug              → listing detail + view count increment
+  POST 🔒/api/listings                   → create listing (multipart/form-data)
+         fields: title, description, district_id, sector_id, price_rwf, price_usd,
+                 size_value, size_unit, latitude, longitude, images[], documents[]
+  GET  🔒/api/listings/mine              → seller's own listings (all statuses)
+  PUT  🔒/api/listings/:id               → edit own listing (re-submits for approval)
+  DELETE🔒/api/listings/:id              → delete own listing
+  PATCH🔒/api/listings/:id/sold          → mark own listing as sold
+
+CONTACT & REPORTS (public — no account needed)
+  POST   /api/contact                    → contact form → email to seller
+         body: { listing_id, sender_name, sender_email, message_body }
+  POST   /api/listings/:id/report        → report an inappropriate listing
+         body: { reason, reporter_email (optional) }
+
+MESSAGING (🔒 auth required)
+  POST 🔒/api/messages                   → send a message
+         body: { receiver_id, body, listing_id (optional) }
+  GET  🔒/api/messages/inbox             → your conversation list
+  GET  🔒/api/messages/unread-count      → badge count
+  GET  🔒/api/messages/thread/:user_id   → full thread with a user
+         ?listing_id=  filter to a specific listing
+
+SITEMAP (public)
+  GET    /api/sitemap.xml               → XML sitemap of all approved listings
+
+ADMIN (🔒🔒 requires admin or sub_admin token)
+  GET    /api/admin/listings             → all listings (?status=pending/approved/etc)
+  PATCH  /api/admin/listings/:id/approve → approve a listing
+  PATCH  /api/admin/listings/:id/reject  → reject (body: { reason })
+  DELETE /api/admin/listings/:id         → delete any listing
+  PATCH  /api/admin/listings/:id/feature → feature/unfeature (admin only)
+  PATCH  /api/admin/listings/:id/premium → set premium flag (admin only)
+  GET    /api/admin/users                → all users
+  PATCH  /api/admin/users/:id/status     → approve or block a user
+  PATCH  /api/admin/users/:id/verify     → assign verified badge (admin only)
+  GET    /api/admin/notifications        → your notification feed
+  PATCH  /api/admin/notifications/:id/read → mark notification as read
+  GET    /api/admin/analytics            → totals: users, listings by status, top viewed
+  GET    /api/admin/reports              → all flagged listings
+  PATCH  /api/admin/reports/:id          → update report status (reviewed/dismissed)
+
+════════════════════════════════════════════════════════════
+DATABASE TABLES (all created by schema.sql)
+════════════════════════════════════════════════════════════
+
+  provinces          → 5 Rwanda provinces
+  districts          → 30 Rwanda districts (linked to provinces)
+  sectors            → 383 Rwanda sectors (linked to districts)
+  users              → all user accounts (role: admin/sub_admin/seller/buyer)
+  password_reset_tokens → time-limited codes for password reset
+  listings           → the core listing entity
+  listing_images     → multiple photos per listing
+  listing_documents  → optional land ownership proof files
+  messages           → buyer-seller in-platform chat
+  reports            → flagged listings
+  payments           → MTN MoMo transactions (Phase 3 — table ready)
+  subscriptions      → agent subscription plans (Phase 3 — table ready)
+  notifications      → in-app admin alerts
+
+════════════════════════════════════════════════════════════
+WHAT IS NOT BUILT YET (Phase 3 — future)
+════════════════════════════════════════════════════════════
+
+  - MTN Mobile Money (MoMo) payment integration
+  - Paid listing fees and featured placement payments
+  - Agent subscription plan enforcement
+  - Revenue analytics dashboard
+
+The database tables for all of the above already exist (payments, subscriptions).
+Only the API routes and MoMo API calls need to be added when ready.
+
+════════════════════════════════════════════════════════════
+IF SOMETHING GOES WRONG
+════════════════════════════════════════════════════════════
+
+"connect ECONNREFUSED 127.0.0.1:5432"
+  → PostgreSQL is not running. Start it:
+    Windows: open Services → start "postgresql-x64-18"
+    Linux/Mac: sudo service postgresql start
+
+"password authentication failed for user postgres"
+  → The password in .env doesn't match your PostgreSQL password.
+    Change DB_PASSWORD=12345 to whatever your PostgreSQL password is,
+    or reset it: psql -U postgres -c "ALTER USER postgres PASSWORD '12345';"
+
+"relation already exists" when running schema.sql
+  → You ran it twice. Drop and recreate:
+    psql -U postgres -c "DROP DATABASE gw_land_db;"
+    psql -U postgres -c "CREATE DATABASE gw_land_db;"
+    Then re-run both SQL files.
+
+"Cannot find module"
+  → Run npm install first.

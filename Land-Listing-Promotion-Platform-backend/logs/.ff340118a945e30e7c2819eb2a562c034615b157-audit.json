@@ -1,0 +1,25 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "D:\\Projects General\\GW_land\\Land-Listing-Promotion-Platform-backend\\logs\\.ff340118a945e30e7c2819eb2a562c034615b157-audit.json",
+    "files": [
+        {
+            "date": 1786454601374,
+            "name": "D:\\Projects General\\GW_land\\Land-Listing-Promotion-Platform-backend\\logs\\error-2026-08-11.log",
+            "hash": "81e8b2661d50bd63415ba881c317b7844fe152ae643ccf8001105a0132535e8c"
+        },
+        {
+            "date": 1786488345576,
+            "name": "D:\\Projects General\\GW_land\\Land-Listing-Promotion-Platform-backend\\logs\\error-2026-08-12.log",
+            "hash": "e5d0e7dc2a716870412b59ff88774a9ac7a55d6d08d028e2c1253e2f2e152f6c"
+        },
+        {
+            "date": 1787173120154,
+            "name": "D:\\Projects General\\GW_land\\Land-Listing-Promotion-Platform-backend\\logs\\error-2026-08-19.log",
+            "hash": "d14d8137e687836f4660a981a4c2609bf38273f6404f6272761dc073b91521df"
+        }
+    ],
+    "hashType": "sha256"
+}

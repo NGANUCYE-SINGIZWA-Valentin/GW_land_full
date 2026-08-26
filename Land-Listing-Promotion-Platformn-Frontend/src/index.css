@@ -1,0 +1,128 @@
+/* 🌐 1. Importation des polices Google Fonts (Raleway & Inter) */
+@import url('https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,100..900;1,100..900&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+/* Poppins is scoped to the footer only (see src/layouts/public/Footer.tsx) */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+/* Quicksand is scoped to the About page only (see src/pages/public/AboutPage.tsx) */
+
+/* Smooth scrolling for anchor links */
+html {
+  scroll-behavior: smooth;
+  font-family: 'Raleway', sans-serif;
+  font-optical-sizing: auto;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+body {
+  font-family: 'Raleway', sans-serif;
+  font-optical-sizing: auto;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* 📐 2. Redéfinition de la police sans-serif globale de Tailwind */
+  --font-sans: 'Raleway', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-raleway: 'Raleway', sans-serif;
+
+  /* 🎨 GW Land design system — premium real estate colors */
+  --color-brand-primary: #1B395F;
+  --color-brand-primary-hover: #122844;
+  --color-brand-secondary: #54B5BB;
+  --color-brand-secondary-hover: #439CA2;
+  --color-brand-dark: #122844;
+  --color-brand-dark-hover: #1B395F;
+  --color-brand-dark-active: #091524;
+  --color-brand-accent: #54B5BB;
+  --color-brand-accent-hover: #439CA2;
+  --color-brand-surface: #F8FAFC;
+  --color-brand-text: #0F172A;
+  --color-brand-bg: #F8FAFC;
+  --color-brand-muted: #64748B;
+
+  /* Motion tokens — shared easing curves for dashboard UI transitions */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.quicksand-about {
+  font-family: "Quicksand", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+}
+
+/* Infinite horizontal scroll for the partner-logo strip (src/sections/PartnerLogo.tsx) */
+@keyframes partner-logo-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* 🚀 Custom Glassmorphism & Modern Dashboard Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.gradient-text-brand {
+  background: linear-gradient(135deg, #1B395F 0%, #3B82F6 50%, #54B5BB 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-emerald {
+  background: linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-purple {
+  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #C084FC 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Custom Scrollbar for dashboard tables and drawers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
