@@ -28,12 +28,13 @@ export const TopAgentsPage: React.FC = () => {
 
     useEffect(() => {
         adminApi.getTopSellers()
-            .then((res) => setSellers(res.sellers))
+            .then((res) => setSellers(res?.sellers || []))
+            .catch(() => setSellers([]))
             .finally(() => setLoading(false));
     }, []);
 
     const ranked: RankedSeller[] = useMemo(
-        () => sellers.map((s, i) => ({ ...s, rank: i + 1 })),
+        () => (sellers || []).map((s, i) => ({ ...s, rank: i + 1 })),
         [sellers]
     );
 

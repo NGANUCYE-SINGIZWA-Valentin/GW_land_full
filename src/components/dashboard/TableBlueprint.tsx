@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search, SlidersHorizontal, Columns2, Check, X, Inbox } from 'lucide-react';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 export interface ColumnConfig<T> {
     header: string;
@@ -10,6 +11,8 @@ export interface ColumnConfig<T> {
     cellClassName?: string;   // Appliqué uniquement au <td>
     hideable?: boolean;       // Si false, la colonne ne peut pas être masquée (défaut: true)
     defaultVisible?: boolean; // Visibilité initiale (défaut: true)
+    tooltip?: string | React.ReactNode; // Interactive tooltip for the column header
+    tooltipTitle?: string;
 }
 
 export interface FilterOption {
@@ -47,8 +50,8 @@ interface TableBlueprintProps<T> {
 }
 
 export function TableBlueprint<T extends { id: string | number }>({
-    data,
-    columns,
+    data = [],
+    columns = [],
     isLoading = false,
     searchPlaceholder = "Search...",
     totalItems = 0,
@@ -62,10 +65,13 @@ export function TableBlueprint<T extends { id: string | number }>({
     hasNextPage = false,
     emptyMessage = "No data found.",
 }: TableBlueprintProps<T>) {
+    const safeData = Array.isArray(data) ? data : [];
+    const safeColumns = Array.isArray(columns) ? columns : [];
+
     // 🎛️ ÉTAT DE VISIBILITÉ DES COLONNES
     const [columnVisibility, setColumnVisibility] = useState<Record<number, boolean>>(() => {
         const initial: Record<number, boolean> = {};
-        columns.forEach((col, index) => {
+        safeColumns.forEach((col, index) => {
             initial[index] = col.defaultVisible ?? true;
         });
         return initial;
@@ -92,11 +98,11 @@ export function TableBlueprint<T extends { id: string | number }>({
     const filterMenuRef = useRef<HTMLDivElement>(null);
 
     // Filtrer les colonnes visibles
-    const visibleColumns = columns.filter((_, index) => columnVisibility[index] !== false);
+    const visibleColumns = safeColumns.filter((_, index) => columnVisibility[index] !== false);
 
     // 📊 DONNÉES FILTRÉES (recherche + filtres)
     const filteredData = useMemo(() => {
-        let result = data;
+        let result = safeData;
 
         // 1️⃣ Appliquer les filtres par colonne
         const activeFilterKeys = Object.entries(selectedFilters)
@@ -350,7 +356,21 @@ export function TableBlueprint<T extends { id: string | number }>({
                                     key={index}
                                     className={`py-3 px-3 sm:px-5 ${column.headerClassName || ''}`}
                                 >
-                                    {column.header}
+                                    {column.tooltip ? (
+                                        <Tooltip
+                                            title={column.tooltipTitle || column.header}
+                                            content={column.tooltip}
+                                            position="top"
+                                            variant="dark"
+                                            maxWidth="max-w-xs"
+                                        >
+                                            <span className="inline-flex items-center gap-1 cursor-help border-b border-dotted border-slate-300 dark:border-slate-600 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+                                                {column.header}
+                                            </span>
+                                        </Tooltip>
+                                    ) : (
+                                        column.header
+                                    )}
                                 </th>
                             ))}
                         </tr>
@@ -389,7 +409,7 @@ export function TableBlueprint<T extends { id: string | number }>({
                             <AnimatePresence initial={false}>
                                 {filteredData.map((row, rowIndex) => (
                                     <motion.tr
-                                        key={row.id}
+                                        key={row?.id ?? rowIndex}
                                         layout={!reduceMotion}
                                         initial={reduceMotion ? undefined : { opacity: 0, y: 4 }}
                                         animate={{ opacity: 1, y: 0 }}
@@ -420,7 +440,7 @@ export function TableBlueprint<T extends { id: string | number }>({
 
             {/* 📑 FOOTER DE PAGINATION CENTRALISÉ */}
             <div className="p-4 bg-slate-50/60 dark:bg-slate-900/60 border-t border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Showing <span className="text-slate-900 dark:text-white font-extrabold">{filteredData.length}</span> of <span className="text-slate-900 dark:text-white font-extrabold">{totalItems || data.length}</span> items</span>
+                <span>Showing <span className="text-slate-900 dark:text-white font-extrabold">{filteredData.length}</span> of <span className="text-slate-900 dark:text-white font-extrabold">{totalItems || safeData.length}</span> items</span>
                 <div className="flex items-center gap-2">
                     <button
                         onClick={onPrevPage}

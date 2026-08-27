@@ -21,12 +21,14 @@ interface FeaturedPropertiesGridProps {
 
 export const FeaturedPropertiesGrid: React.FC<FeaturedPropertiesGridProps> = ({
   title,
-  properties,
+  properties = [],
   onViewAll,
   onPrev,
   onNext,
   onCardClick
 }) => {
+  const safeProperties = Array.isArray(properties) ? properties : [];
+
   return (
     <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm w-full min-w-0">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
@@ -56,7 +58,7 @@ export const FeaturedPropertiesGrid: React.FC<FeaturedPropertiesGridProps> = ({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 w-full min-w-0">
-        {properties.map((item, i) => (
+        {safeProperties.map((item, i) => (
           <div
             key={i}
             onClick={() => onCardClick?.(item.id)}

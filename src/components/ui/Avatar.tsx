@@ -11,14 +11,16 @@ const PALETTE = [
   'bg-indigo-500 text-white',
 ];
 
-function colorFor(name: string): string {
+function colorFor(name?: string | null): string {
+  const safeName = typeof name === 'string' ? name : '';
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < safeName.length; i++) hash = safeName.charCodeAt(i) + ((hash << 5) - safeName);
   return PALETTE[Math.abs(hash) % PALETTE.length];
 }
 
-function initialsFor(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+function initialsFor(name?: string | null): string {
+  const safeName = typeof name === 'string' ? name : '';
+  const parts = safeName.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
   return parts.slice(0, 2).map((p) => p[0]?.toUpperCase()).join('');
 }
@@ -33,21 +35,22 @@ const SIZE_CLASSES = {
 
 interface AvatarProps {
   src?: string | null;
-  name: string;
+  name?: string | null;
   size?: keyof typeof SIZE_CLASSES;
   className?: string;
 }
 
-export const Avatar: React.FC<AvatarProps> = ({ src, name, size = 'md', className = '' }) => {
+export const Avatar: React.FC<AvatarProps> = ({ src, name = 'User', size = 'md', className = '' }) => {
   const base = `${SIZE_CLASSES[size]} rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center font-bold ${className}`;
+  const displayName = name || 'User';
 
   if (src) {
-    return <img src={src} alt={name} className={`${base} object-cover border border-slate-200`} />;
+    return <img src={src} alt={displayName} className={`${base} object-cover border border-slate-200`} />;
   }
 
   return (
-    <div className={`${base} ${colorFor(name)}`} title={name}>
-      {initialsFor(name)}
+    <div className={`${base} ${colorFor(displayName)}`} title={displayName}>
+      {initialsFor(displayName)}
     </div>
   );
 };

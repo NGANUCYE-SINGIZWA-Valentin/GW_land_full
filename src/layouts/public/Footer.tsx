@@ -85,7 +85,7 @@ const socialLinks: { label: string; href: string; Icon: SocialIcon }[] = [
 export const Footer: React.FC = () => {
   const { t } = useTranslation();
   const { districts } = useLocations();
-  const popularDistricts = districts.slice(0, 5);
+  const popularDistricts = (districts || []).slice(0, 5);
 
   return (
     <div className="relative bg-[#111111]" style={{ fontFamily: FOOTER_FONT }}>

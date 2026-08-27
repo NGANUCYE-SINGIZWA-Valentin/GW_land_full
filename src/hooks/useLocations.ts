@@ -20,10 +20,17 @@ export function useLocations() {
     Promise.all([locationsApi.getProvinces(), locationsApi.getDistricts()])
       .then(([p, d]) => {
         if (cancelled) return;
-        provincesCache = p.provinces;
-        districtsCache = d.districts;
-        setProvinces(p.provinces);
-        setDistricts(d.districts);
+        provincesCache = Array.isArray(p?.provinces) ? p.provinces : [];
+        districtsCache = Array.isArray(d?.districts) ? d.districts : [];
+        setProvinces(provincesCache);
+        setDistricts(districtsCache);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        provincesCache = provincesCache || [];
+        districtsCache = districtsCache || [];
+        setProvinces(provincesCache);
+        setDistricts(districtsCache);
       })
       .finally(() => !cancelled && setLoading(false));
     return () => {

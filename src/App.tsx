@@ -43,13 +43,15 @@ import { OAuthCallbackPage } from '@/pages/auth/OAuthCallbackPage';
 import { AuthProvider } from '@/components/auth';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { FavoritesProvider } from '@/components/favorites/FavoritesContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-    <FavoritesProvider>
-    <BrowserRouter>
-      <Routes>
+    <ErrorBoundary>
+      <AuthProvider>
+        <FavoritesProvider>
+          <BrowserRouter>
+            <Routes>
 
         {/* PUBLIC PAGES */}
         <Route element={<PublicLayout />}>
@@ -130,6 +132,7 @@ const App: React.FC = () => {
     </BrowserRouter>
     </FavoritesProvider>
     </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MessageSquareText, Home, ArrowRightLeft, Calculator, Calendar } from 'lucide-react';
+import { Search, MessageSquareText, Home, ArrowRightLeft, Calculator, Calendar, Heart, Eye, Sparkles, MapPin, Filter } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { MessagesList } from '@/components/dashboard/MessagesList';
-import { QuickActionsGrid } from '@/components/dashboard/QuickActionsGrid';
 import { PropertyCard } from '@/components/ui/Card';
 import { PropertyCompareModal } from '@/components/dashboard/PropertyCompareModal';
 import { MortgageCalculatorModal } from '@/components/dashboard/MortgageCalculatorModal';
 import { SiteVisitModal } from '@/components/dashboard/SiteVisitModal';
+import { DashboardButton } from '@/components/ui/DashboardButton';
 import { useAuth } from '@/components/auth/AuthContext';
 import * as messagesApi from '@/api/messages';
 import * as listingsApi from '@/api/listings';
@@ -16,17 +16,16 @@ import type { Conversation } from '@/api/types';
 import type { Property } from '@/types/property';
 import { formatRelativeTime, initials } from '@/utils/format';
 
-const BUYER_ACTIONS = [
-  { label: 'Browse Properties', icon: <Search size={15} /> },
-  { label: 'My Messages', icon: <MessageSquareText size={15} /> },
-];
-
 export const BuyerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [latest, setLatest] = useState<Property[]>([]);
+  const [allListings, setAllListings] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
 
   // Modal states
   const [isCompareOpen, setIsCompareOpen] = useState(false);
@@ -36,100 +35,207 @@ export const BuyerDashboard: React.FC = () => {
   useEffect(() => {
     Promise.all([
       messagesApi.getInbox(),
-      listingsApi.getPublicListings({ limit: 4 }),
+      listingsApi.getPublicListings({ limit: 12 }),
     ])
       .then(([inboxRes, listingsRes]) => {
-        setConversations(inboxRes.conversations);
-        setLatest(listingsRes.listings.map(adaptListingSummary));
+        setConversations(inboxRes?.conversations || []);
+        setAllListings((listingsRes?.listings || []).map(adaptListingSummary));
+      })
+      .catch(() => {
+        setConversations([]);
+        setAllListings([]);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const unread = conversations.reduce((sum, c) => sum + Number(c.unread_count || 0), 0);
-  const otherPartyName = (c: Conversation) => (c.sender_id === user?.id ? c.receiver_name : c.sender_name);
+  const unread = (conversations || []).reduce((sum, c) => sum + Number(c.unread_count || 0), 0);
+  const otherPartyName = (c: Conversation) => (c.sender_id === user?.id ? c.receiver_name : c.sender_name) || 'Seller';
 
-  const messages = conversations.slice(0, 5).map((c) => {
+  const filteredProperties = useMemo(() => {
+    let list = allListings;
+    if (selectedDistrict !== 'all') {
+      list = list.filter((p) => (p.location?.district || '').toLowerCase() === selectedDistrict.toLowerCase());
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((p) =>
+        p.title.toLowerCase().includes(q) ||
+        (p.location?.district || '').toLowerCase().includes(q) ||
+        (p.location?.sector || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [allListings, selectedDistrict, searchQuery]);
+
+  const messages = (conversations || []).slice(0, 5).map((c) => {
     const name = otherPartyName(c);
     return {
       name,
-      message: c.body,
+      message: c.body || '',
       time: formatRelativeTime(c.created_at),
       avatar: initials(name),
       unread: Number(c.unread_count || 0) > 0,
     };
   });
 
+  const districts = ['all', 'Gasabo', 'Kicukiro', 'Nyarugenge', 'Bugesera', 'Rubavu', 'Musanze'];
+
   return (
     <div className="w-full min-w-0 space-y-6">
-      {/* Buyer Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 p-6 sm:p-8 text-white shadow-xl border border-slate-800">
-        <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* Buyer Hero Banner (Navy & Teal Gradient) */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#122844] via-[#1B395F] to-[#122844] p-6 sm:p-8 text-white shadow-xl border border-slate-800">
+        <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-96 h-96 bg-[#54B5BB]/20 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-semibold border border-blue-500/30">
-              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" /> Property Finder Portal
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#54B5BB]/20 text-[#54B5BB] text-xs font-bold border border-[#54B5BB]/30 backdrop-blur-md">
+              <span className="w-2 h-2 rounded-full bg-[#54B5BB] animate-pulse" /> Property Finder Portal
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-              Welcome back, {user?.fullName?.split(' ')[0]} 👋
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              Welcome back, {user?.fullName?.split(' ')[0] || 'Buyer'} 👋
             </h1>
-            <p className="text-sm text-slate-300 max-w-xl">
-              Discover verified land plots, view price comparisons in RWF & USD, and connect with trusted sellers.
+            <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
+              Explore verified land parcels across Rwanda, estimate payments in RWF/USD, schedule on-site boundary visits, and negotiate directly with owners.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
+            <DashboardButton
+              variant="outline"
+              size="md"
+              pill
               onClick={() => setIsVisitOpen(true)}
-              className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-extrabold border border-white/20 transition-all cursor-pointer flex items-center gap-1.5 backdrop-blur-md"
+              icon={<Calendar size={15} />}
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white"
             >
-              <Calendar size={15} /> Schedule Site Visit
-            </button>
+              Schedule Visit
+            </DashboardButton>
 
-            <button
+            <DashboardButton
+              variant="outline"
+              size="md"
+              pill
               onClick={() => setIsCompareOpen(true)}
-              className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-extrabold border border-white/20 transition-all cursor-pointer flex items-center gap-1.5 backdrop-blur-md"
+              icon={<ArrowRightLeft size={15} />}
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white"
             >
-              <ArrowRightLeft size={15} /> Compare Plots
-            </button>
+              Compare Plots
+            </DashboardButton>
 
-            <button
+            <DashboardButton
+              variant="outline"
+              size="md"
+              pill
               onClick={() => setIsMortgageOpen(true)}
-              className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-extrabold border border-white/20 transition-all cursor-pointer flex items-center gap-1.5 backdrop-blur-md"
+              icon={<Calculator size={15} />}
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white"
             >
-              <Calculator size={15} /> Loan Estimator
-            </button>
+              Loan Estimator
+            </DashboardButton>
 
-            <button
+            <DashboardButton
+              variant="teal"
+              size="md"
+              pill
               onClick={() => navigate('/properties')}
-              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5"
+              icon={<Search size={15} />}
             >
-              <Search size={15} /> Explore All Plots
-            </button>
+              Explore Plots
+            </DashboardButton>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
-        <StatCard title="Active Conversations" value={String(conversations.length)} accentGradient="indigo" icon={<MessageSquareText size={20} />} onClick={() => navigate('/messages')} />
-        <StatCard title="Unread Messages" value={String(unread)} changeType={unread > 0 ? 'positive' : 'neutral'} change={unread > 0 ? `${unread} unread` : 'Read all'} accentGradient="cyan" icon={<MessageSquareText size={20} />} onClick={() => navigate('/messages')} />
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 w-full min-w-0">
+        <StatCard
+          title="Active Inquiries"
+          value={String(conversations.length)}
+          accentGradient="teal"
+          icon={<MessageSquareText size={20} />}
+          onClick={() => navigate('/dashboard/messages')}
+          comparisonLabel="seller chats"
+        />
+        <StatCard
+          title="Unread Messages"
+          value={String(unread)}
+          changeType={unread > 0 ? 'positive' : 'neutral'}
+          change={unread > 0 ? `${unread} new` : 'All read'}
+          accentGradient="amber"
+          icon={<MessageSquareText size={20} />}
+          onClick={() => navigate('/dashboard/messages')}
+          comparisonLabel="notifications"
+        />
+        <StatCard
+          title="Saved Favorites"
+          value="4"
+          accentGradient="navy"
+          icon={<Heart size={20} />}
+          comparisonLabel="bookmarked plots"
+          onClick={() => navigate('/dashboard/favorites')}
+        />
       </div>
 
+      {/* Main Grid: Latest Listings + Messages */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="flex justify-between items-center p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="text-sm sm:text-base font-extrabold tracking-tight text-slate-800 dark:text-white">Newest Land Listings</h2>
-              <button onClick={() => navigate('/properties')} className="text-xs font-bold text-brand-primary hover:underline cursor-pointer">Browse All</button>
-            </div>
-            {loading ? (
-              <div className="p-6 grid grid-cols-2 gap-4">
-                {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-40 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />)}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.04)] overflow-hidden">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-extrabold tracking-tight text-slate-800 dark:text-white">
+                    Explore Rwandan Land Catalog
+                  </h2>
+                  <p className="text-xs text-slate-400">Newly approved parcels with cadastral titles</p>
+                </div>
+                <button
+                  onClick={() => navigate('/properties')}
+                  className="text-xs font-extrabold text-[#54B5BB] hover:text-[#439CA2] hover:underline cursor-pointer self-start sm:self-auto transition-colors"
+                >
+                  Browse Full Map →
+                </button>
               </div>
-            ) : latest.length === 0 ? (
-              <div className="p-6 text-sm text-slate-400">No listings available yet — check back soon.</div>
+
+              {/* Quick District Filter Chips */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {districts.map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setSelectedDistrict(d)}
+                    className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold whitespace-nowrap capitalize transition-all duration-200 cursor-pointer shadow-xs hover:-translate-y-0.5 active:translate-y-0 ${
+                      selectedDistrict === d
+                        ? 'bg-[#1B395F] text-white shadow-sm shadow-[#1B395F]/20'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-[#1B395F]'
+                    }`}
+                  >
+                    {d === 'all' ? 'All Districts' : d}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Filter by title, sector, or keywords (e.g. Nyarutarama, lake view, commercial)..."
+                  className="w-full pl-9 pr-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-900 dark:text-white text-xs font-semibold focus:ring-2 focus:ring-[#54B5BB] focus:outline-none shadow-xs"
+                />
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-44 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />)}
+              </div>
+            ) : (filteredProperties || []).length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400 font-medium">
+                No properties match your filter. Try choosing a different district or search query.
+              </div>
             ) : (
-              <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {latest.map((property) => (
+              <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {(filteredProperties || []).slice(0, 6).map((property) => (
                   <PropertyCard key={property.id} property={property} size="sm" />
                 ))}
               </div>
@@ -138,34 +244,7 @@ export const BuyerDashboard: React.FC = () => {
         </div>
 
         <div className="space-y-6">
-          <MessagesList
-            messages={messages}
-            onViewAll={() => navigate('/messages')}
-          />
-
-          <QuickActionsGrid
-            actions={BUYER_ACTIONS}
-            onActionClick={(index) => {
-              const routes = [
-                () => navigate('/properties'),
-                () => navigate('/messages'),
-              ];
-              routes[index]();
-            }}
-          />
-
-          <div className="bg-brand-primary rounded-2xl p-6 text-white flex flex-col gap-3">
-            <Home size={24} className="opacity-80" />
-            <p className="text-sm font-semibold leading-relaxed">
-              Ready to find your next plot? Browse verified listings across every district in Rwanda.
-            </p>
-            <button
-              onClick={() => navigate('/properties')}
-              className="self-start bg-white text-brand-primary text-xs font-bold px-4 py-2 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              Browse Properties
-            </button>
-          </div>
+          <MessagesList messages={messages} onViewAll={() => navigate('/dashboard/messages')} />
         </div>
       </div>
 
@@ -173,19 +252,12 @@ export const BuyerDashboard: React.FC = () => {
       <PropertyCompareModal
         isOpen={isCompareOpen}
         onClose={() => setIsCompareOpen(false)}
-        availableProperties={latest}
+        availableProperties={allListings}
       />
-
-      <MortgageCalculatorModal
-        isOpen={isMortgageOpen}
-        onClose={() => setIsMortgageOpen(false)}
-      />
-
-      <SiteVisitModal
-        isOpen={isVisitOpen}
-        onClose={() => setIsVisitOpen(false)}
-        property={latest[0] || null}
-      />
+      <MortgageCalculatorModal isOpen={isMortgageOpen} onClose={() => setIsMortgageOpen(false)} />
+      <SiteVisitModal isOpen={isVisitOpen} onClose={() => setIsVisitOpen(false)} />
     </div>
   );
 };
+
+export default BuyerDashboard;

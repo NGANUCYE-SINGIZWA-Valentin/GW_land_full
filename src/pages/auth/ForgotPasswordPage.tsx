@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'framer-motion';
 import GWLandLogo from '@/components/ui/GWLandLogo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { Mail, Lock, KeyRound } from 'lucide-react';
+import { Mail, Lock, KeyRound, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -71,9 +72,29 @@ export const ForgotPasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-7 flex flex-col justify-center transition-all duration-300 shadow-none">
+    <motion.div 
+      initial={{ opacity: 0, y: 16, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+      className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-7 flex flex-col justify-center transition-all duration-300 shadow-xl overflow-hidden"
+    >
+      {loading && (
+        <div className="absolute top-0 left-0 right-0 h-1 bg-slate-100 dark:bg-slate-800 overflow-hidden">
+          <motion.div
+            initial={{ x: '-100%' }}
+            animate={{ x: '100%' }}
+            transition={{ repeat: Infinity, duration: 1.1, ease: 'easeInOut' }}
+            className="h-full w-1/2 bg-gradient-to-r from-[#54B5BB] via-[#1B395F] to-[#54B5BB]"
+          />
+        </div>
+      )}
 
-      <div className="mb-4 flex flex-col items-center text-center">
+      <motion.div 
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.32, delay: 0.05 }}
+        className="mb-4 flex flex-col items-center text-center"
+      >
         <Link to="/" className="mb-2 inline-block hover:scale-105 transition-transform duration-200" title="Go to home page">
           <GWLandLogo className="h-6 sm:h-7 w-auto max-w-[80px] object-contain" />
         </Link>
@@ -85,46 +106,79 @@ export const ForgotPasswordPage: React.FC = () => {
             ? t('auth.enterEmailForReset')
             : t('auth.enterCodeAndNewPassword')}
         </p>
-      </div>
+      </motion.div>
 
-      {error && (
-        <div className="mb-3 p-2.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl border border-red-100 dark:border-red-900/30">
-          {error}
-        </div>
-      )}
-      {info && (
-        <div className="mb-3 p-2.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-xl border border-emerald-100 dark:border-emerald-900/30">
-          {info}
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0, y: -6 }}
+            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -6 }}
+            className="mb-3 p-2.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl border border-red-100 dark:border-red-900/30"
+          >
+            {error}
+          </motion.div>
+        )}
+        {info && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0, y: -6 }}
+            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -6 }}
+            className="mb-3 p-2.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-xl border border-emerald-100 dark:border-emerald-900/30"
+          >
+            {info}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {step === 'request' ? (
-        <form className="space-y-3" onSubmit={handleRequest}>
+        <motion.form 
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.32, delay: 0.1 }}
+          className="space-y-3" 
+          onSubmit={handleRequest}
+        >
           <Input
             label={t('auth.emailAddressLabel')}
             name="email"
             placeholder="johndoe@example.com"
             type="email"
             icon={<Mail size={16} />}
+            disabled={loading}
             required
           />
           <Button
             type="submit"
             variant="primary"
-            className="w-full py-3 rounded-xl text-xs sm:text-sm font-extrabold bg-brand-primary hover:bg-brand-primary-hover dark:bg-brand-secondary dark:text-slate-900 dark:hover:bg-brand-secondary-hover shadow-none mt-1"
+            className="w-full py-3 rounded-xl text-xs sm:text-sm font-extrabold bg-brand-primary hover:bg-brand-primary-hover dark:bg-brand-secondary dark:text-slate-900 dark:hover:bg-brand-secondary-hover shadow-none mt-1 flex items-center justify-center gap-2"
             disabled={loading}
           >
-            {loading ? t('propertyDetails.sending') : t('auth.sendResetCode')}
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>{t('propertyDetails.sending') || 'Sending...'}</span>
+              </>
+            ) : (
+              t('auth.sendResetCode')
+            )}
           </Button>
-        </form>
+        </motion.form>
       ) : (
-        <form className="space-y-3" onSubmit={handleReset}>
+        <motion.form 
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.32, delay: 0.1 }}
+          className="space-y-3" 
+          onSubmit={handleReset}
+        >
           <Input
             label={t('auth.resetCode')}
             name="token"
             placeholder={t('auth.resetCodePlaceholder')}
             type="text"
             icon={<KeyRound size={16} />}
+            disabled={loading}
             required
           />
           <Input
@@ -133,6 +187,7 @@ export const ForgotPasswordPage: React.FC = () => {
             placeholder={t('auth.passwordAtLeast8')}
             type="password"
             icon={<Lock size={16} />}
+            disabled={loading}
             required
           />
           <Input
@@ -141,25 +196,40 @@ export const ForgotPasswordPage: React.FC = () => {
             placeholder="••••••••"
             type="password"
             icon={<Lock size={16} />}
+            disabled={loading}
             required
           />
           <Button
             type="submit"
             variant="primary"
-            className="w-full py-3 rounded-xl text-xs sm:text-sm font-extrabold bg-brand-primary hover:bg-brand-primary-hover dark:bg-brand-secondary dark:text-slate-900 dark:hover:bg-brand-secondary-hover shadow-none mt-1"
+            className="w-full py-3 rounded-xl text-xs sm:text-sm font-extrabold bg-brand-primary hover:bg-brand-primary-hover dark:bg-brand-secondary dark:text-slate-900 dark:hover:bg-brand-secondary-hover shadow-none mt-1 flex items-center justify-center gap-2"
             disabled={loading}
           >
-            {loading ? t('auth.resetting') : t('auth.resetPasswordAction')}
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>{t('auth.resetting') || 'Resetting...'}</span>
+              </>
+            ) : (
+              t('auth.resetPasswordAction')
+            )}
           </Button>
-        </form>
+        </motion.form>
       )}
 
-      <p className="text-center mt-8 text-xs sm:text-sm font-bold text-gray-500 dark:text-slate-400">
+      <motion.p 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.32, delay: 0.2 }}
+        className="text-center mt-8 text-xs sm:text-sm font-bold text-gray-500 dark:text-slate-400"
+      >
         {t('auth.rememberedPassword')}{' '}
         <Link to="/login" className="text-brand-primary dark:text-brand-secondary font-extrabold hover:underline">
           {t('auth.logIn')}
         </Link>
-      </p>
-    </div>
+      </motion.p>
+    </motion.div>
   );
 };
+
+export default ForgotPasswordPage;

@@ -1,17 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Settings } from 'lucide-react';
-import { NavLink, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Bell, LogOut, MessageCircle, ChevronDown, CheckCheck,
-  LayoutDashboard, Users, Building2, Wallet, MessageSquare,
+  Building2, MessageSquare,
   PlusCircle, Store, Flag, Trophy, TrendingUp, Tag, Heart,
-  Menu, X
+  Menu, Settings, PanelLeftClose, PanelLeftOpen,
+  Search, ExternalLink, Compass, ShieldCheck
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import { Avatar } from '@/components/ui/Avatar';
 import GWLandLogo from '@/components/ui/GWLandLogo';
+import { Tooltip } from '@/components/ui/Tooltip';
 import * as messagesApi from '@/api/messages';
 import * as adminApi from '@/api/admin';
 import type { AdminNotification } from '@/api/types';
@@ -26,60 +27,40 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, cb: () => voi
   }, [ref, cb]);
 }
 
-/* ─── nav items per role ─────────────────────────────────────── */
-interface NavItem { icon: React.ReactNode; label: string; to: string }
-
-function getNavItems(role: string): NavItem[] {
-  switch (role) {
-    case 'Administrator':
-      return [
-        { icon: <LayoutDashboard size={15} />, label: 'Dashboard', to: '/admin/dashboard' },
-        { icon: <Users size={15} />, label: 'Users', to: '/admin/users' },
-        { icon: <Building2 size={15} />, label: 'Properties', to: '/admin/properties' },
-        { icon: <Wallet size={15} />, label: 'Revenue', to: '/admin/revenue' },
-        { icon: <MessageSquare size={15} />, label: 'Messages', to: '/admin/messages' },
-        { icon: <Flag size={15} />, label: 'Reports', to: '/admin/reported-content' },
-        { icon: <Trophy size={15} />, label: 'Top Agents', to: '/admin/top-agents' },
-        { icon: <CheckCheck size={15} />, label: 'Audit Trail', to: '/admin/audit-logs' },
-      ];
-    case 'SubAdmin':
-      return [
-        { icon: <LayoutDashboard size={15} />, label: 'Dashboard', to: '/admin/sub-dashboard' },
-        { icon: <Users size={15} />, label: 'Users', to: '/admin/users' },
-        { icon: <Building2 size={15} />, label: 'Properties', to: '/admin/properties' },
-        { icon: <MessageSquare size={15} />, label: 'Messages', to: '/admin/messages' },
-        { icon: <Flag size={15} />, label: 'Reports', to: '/admin/reported-content' },
-        { icon: <Trophy size={15} />, label: 'Top Agents', to: '/admin/top-agents' },
-        { icon: <CheckCheck size={15} />, label: 'Audit Trail', to: '/admin/audit-logs' },
-      ];
-    case 'Seller':
-      return [
-        { icon: <Store size={15} />, label: 'Dashboard', to: '/seller/dashboard' },
-        { icon: <Building2 size={15} />, label: 'My Properties', to: '/seller/properties' },
-        { icon: <PlusCircle size={15} />, label: 'Add Property', to: '/dashboard/properties/new' },
-        { icon: <MessageSquare size={15} />, label: 'Inquiries', to: '/seller/inquiries' },
-        { icon: <TrendingUp size={15} />, label: 'Top Performing', to: '/seller/top-performing' },
-        { icon: <Tag size={15} />, label: 'Pricing', to: '/seller/pricing' },
-      ];
-    case 'Buyer':
-      return [
-        { icon: <LayoutDashboard size={15} />, label: 'Overview', to: '/dashboard' },
-        { icon: <Heart size={15} />, label: 'Favorites', to: '/favorites' },
-        { icon: <MessageSquare size={15} />, label: 'Messages', to: '/messages' },
-      ];
-    default:
-      return [];
-  }
+function getRoleMeta(role: string) {
+  const map: Record<string, { label: string; dot: string; pill: string; badge: string }> = {
+    Administrator: { label: 'Admin Portal', dot: 'bg-[#54B5BB]', pill: 'bg-[#1B395F]/10 text-[#1B395F] border-[#1B395F]/20', badge: 'Admin' },
+    SubAdmin:      { label: 'Sub-Admin Portal', dot: 'bg-purple-400', pill: 'bg-purple-50 text-purple-700 border-purple-200', badge: 'Moderator' },
+    Seller:        { label: 'Seller Portal', dot: 'bg-[#54B5BB]', pill: 'bg-[#54B5BB]/10 text-[#1B395F] border-[#54B5BB]/30', badge: 'Seller/Agent' },
+    Buyer:         { label: 'Buyer Portal', dot: 'bg-blue-400', pill: 'bg-blue-50 text-blue-700 border-blue-200', badge: 'Buyer' },
+  };
+  return map[role] ?? { label: role, dot: 'bg-slate-400', pill: 'bg-slate-100 text-slate-600 border-slate-200', badge: role };
 }
 
-function getRoleMeta(role: string) {
-  const map: Record<string, { label: string; dot: string; pill: string }> = {
-    Administrator: { label: 'Admin Portal', dot: 'bg-[#54B5BB]', pill: 'bg-[#1B395F]/10 text-[#1B395F] border-[#1B395F]/20' },
-    SubAdmin:      { label: 'Sub-Admin Portal', dot: 'bg-purple-400', pill: 'bg-purple-50 text-purple-700 border-purple-200' },
-    Seller:        { label: 'Seller Portal', dot: 'bg-[#54B5BB]', pill: 'bg-[#54B5BB]/10 text-[#1B395F] border-[#54B5BB]/30' },
-    Buyer:         { label: 'Buyer Portal', dot: 'bg-blue-400', pill: 'bg-blue-50 text-blue-700 border-blue-200' },
-  };
-  return map[role] ?? { label: role, dot: 'bg-slate-400', pill: 'bg-slate-100 text-slate-600 border-slate-200' };
+function getBreadcrumb(pathname: string): { section: string; page: string } {
+  if (pathname.startsWith('/admin/dashboard') || pathname.startsWith('/admin/sub-dashboard')) return { section: 'Administration', page: 'Overview' };
+  if (pathname.startsWith('/admin/properties')) return { section: 'Registry', page: 'Properties & UPI Review' };
+  if (pathname.startsWith('/admin/users')) return { section: 'Access Control', page: 'User Accounts' };
+  if (pathname.startsWith('/admin/revenue')) return { section: 'Finance', page: 'Revenue & Plans' };
+  if (pathname.startsWith('/admin/reported-content')) return { section: 'Trust & Safety', page: 'Disputes & Reports' };
+  if (pathname.startsWith('/admin/top-agents')) return { section: 'Directory', page: 'Top Performing Agents' };
+  if (pathname.startsWith('/admin/audit-logs')) return { section: 'Security', page: 'Audit Trail & Logs' };
+  if (pathname.startsWith('/admin/messages')) return { section: 'Communications', page: 'Admin Messages' };
+  if (pathname.startsWith('/admin/settings')) return { section: 'System', page: 'Platform Settings' };
+  
+  if (pathname.startsWith('/seller/dashboard')) return { section: 'Seller Hub', page: 'Dashboard Overview' };
+  if (pathname.startsWith('/seller/properties')) return { section: 'Portfolios', page: 'My Land Listings' };
+  if (pathname.startsWith('/dashboard/properties/new')) return { section: 'Publishing', page: 'Add Land Parcel' };
+  if (pathname.startsWith('/seller/inquiries')) return { section: 'Leads', page: 'Buyer Inquiries' };
+  if (pathname.startsWith('/seller/top-performing')) return { section: 'Analytics', page: 'Top Performing Listings' };
+  if (pathname.startsWith('/seller/pricing')) return { section: 'Monetization', page: 'Boosts & Pricing' };
+  
+  if (pathname.startsWith('/dashboard')) return { section: 'Buyer Hub', page: 'Marketplace Overview' };
+  if (pathname.startsWith('/favorites')) return { section: 'Saved', page: 'Favorite Properties' };
+  if (pathname.startsWith('/messages')) return { section: 'Inquiries', page: 'Seller Conversations' };
+  if (pathname.startsWith('/account')) return { section: 'Profile', page: 'Account Settings' };
+  
+  return { section: 'Dashboard', page: 'Overview' };
 }
 
 /* ─── dropdown animation ─────────────────────────────────────── */
@@ -89,14 +70,25 @@ const dropdownV = {
   exit:   { opacity: 0, scale: 0.94, y: -8, transition: { duration: 0.15 } },
 };
 
+export interface TopbarProps {
+  onToggleMobileSidebar?: () => void;
+  onToggleCollapseSidebar?: () => void;
+  isSidebarCollapsed?: boolean;
+}
+
 /* ─── component ──────────────────────────────────────────────── */
-const Topbar: React.FC = () => {
+export const Topbar: React.FC<TopbarProps> = ({
+  onToggleMobileSidebar,
+  onToggleCollapseSidebar,
+  isSidebarCollapsed = false,
+}) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
   const { currency, setCurrency } = useCurrency();
   const role = user?.role ?? '';
-  const navItems = getNavItems(role);
   const roleMeta = getRoleMeta(role);
+  const breadcrumb = getBreadcrumb(location.pathname);
 
   const isSeller    = role === 'Seller';
   const isBuyer     = role === 'Buyer';
@@ -106,22 +98,20 @@ const Topbar: React.FC = () => {
   const [notifications,  setNotifications]  = useState<AdminNotification[]>([]);
   const [notifOpen,   setNotifOpen]   = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [mobileOpen,  setMobileOpen]  = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const notifRef   = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const mobileRef  = useRef<HTMLDivElement>(null);
   useClickOutside(notifRef,   () => setNotifOpen(false));
   useClickOutside(profileRef, () => setProfileOpen(false));
-  useClickOutside(mobileRef,  () => setMobileOpen(false));
 
   useEffect(() => {
     let cancelled = false;
     const load = () => {
       if (isSeller || isBuyer) {
-        messagesApi.getUnreadCount().then(r => !cancelled && setUnreadMessages(r.unread_count)).catch(() => {});
+        messagesApi.getUnreadCount().then(r => !cancelled && setUnreadMessages(Number(r?.unread_count || 0))).catch(() => {});
       } else if (isAdminLike) {
-        adminApi.getNotifications().then(r => !cancelled && setNotifications(r.notifications)).catch(() => {});
+        adminApi.getNotifications().then(r => !cancelled && setNotifications(Array.isArray(r?.notifications) ? r.notifications : [])).catch(() => {});
       }
     };
     load();
@@ -129,13 +119,13 @@ const Topbar: React.FC = () => {
     return () => { cancelled = true; clearInterval(iv); };
   }, [isSeller, isBuyer, isAdminLike]);
 
-  const unreadNotif = notifications.filter(n => !n.is_read).length;
+  const unreadNotif = (notifications || []).filter(n => !n?.is_read).length;
 
   const handleNotifClick = async (n: AdminNotification) => {
-    if (!n.is_read) {
+    if (!n?.is_read) {
       try {
         await adminApi.markNotificationRead(n.id);
-        setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
+        setNotifications(prev => (prev || []).map(x => x.id === n.id ? { ...x, is_read: true } : x));
       } catch { /* non-critical */ }
     }
     setNotifOpen(false);
@@ -143,101 +133,164 @@ const Topbar: React.FC = () => {
     else if (n.type === 'new_user') navigate('/admin/users');
   };
 
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    if (isAdminLike) {
+      navigate(`/admin/properties?q=${encodeURIComponent(searchQuery.trim())}`);
+    } else if (isSeller) {
+      navigate(`/seller/properties?q=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      navigate(`/properties?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
   /* ── render ── */
   return (
-    <header className="shrink-0 z-30 bg-white border-b border-slate-200/70 shadow-sm w-full max-w-[100vw]">
+    <header className="shrink-0 z-30 bg-white border-b border-slate-200/80 shadow-xs w-full max-w-[100vw]">
 
       {/* ═══ Main bar ═══ */}
-      <div className="flex items-center gap-3 h-16 px-3 lg:px-6 min-w-0 max-w-full">
+      <div className="flex items-center justify-between gap-3 h-16 px-3 sm:px-5 lg:px-6 min-w-0 max-w-full">
 
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5 flex-shrink-0 group mr-2">
-          <GWLandLogo className="h-8 w-auto flex-shrink-0" />
-          <span className="text-lg font-black tracking-tight hidden sm:block" style={{ color: '#1B395F' }}>
-            GW<span style={{ color: '#54B5BB' }}>LAND</span>
-          </span>
-        </Link>
+        {/* ── Left section: Sidebar toggles & Breadcrumbs ── */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          {/* Mobile menu trigger */}
+          <button
+            onClick={onToggleMobileSidebar}
+            className="lg:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all mr-0.5 cursor-pointer"
+            aria-label="Toggle navigation menu"
+          >
+            <Menu size={20} />
+          </button>
 
-        {/* Vertical divider */}
-        <div className="hidden lg:block h-6 w-px bg-slate-200 flex-shrink-0" />
+          {/* Logo (shown on mobile or when standalone) */}
+          <Link to="/" className="flex items-center gap-2 flex-shrink-0 group mr-2 lg:hidden">
+            <GWLandLogo className="h-7 w-auto flex-shrink-0" />
+            <span className="text-base font-black tracking-tight" style={{ color: '#1B395F' }}>
+              GW<span style={{ color: '#54B5BB' }}>LAND</span>
+            </span>
+          </Link>
 
-        {/* ── Desktop nav links — pill-style ── */}
-        <nav className="hidden lg:flex items-center gap-1 flex-1 min-w-0 overflow-x-auto no-scrollbar py-1">
-          {navItems.map(item => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end
-              className={({ isActive }) =>
-                `flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all duration-150 flex-shrink-0 border ${
-                  isActive
-                    ? 'text-white border-transparent shadow-sm'
-                    : 'text-slate-500 border-transparent hover:border-slate-200 hover:bg-slate-50 hover:text-slate-800'
-                }`
+          {/* Desktop Sidebar Collapse Button */}
+          {onToggleCollapseSidebar && (
+            <div className="hidden lg:flex items-center">
+              <Tooltip
+                content={isSidebarCollapsed ? 'Expand navigation sidebar' : 'Collapse navigation sidebar (Icon only)'}
+                position="right"
+                variant="dark"
+              >
+                <button
+                  type="button"
+                  onClick={onToggleCollapseSidebar}
+                  className="p-2 text-slate-400 hover:text-[#1B395F] hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                  aria-label="Toggle sidebar width"
+                >
+                  {isSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+                </button>
+              </Tooltip>
+            </div>
+          )}
+
+          {/* Breadcrumbs / Page context */}
+          <div className="hidden sm:flex items-center gap-2 min-w-0 border-l border-slate-200 pl-3">
+            <span className="text-xs font-semibold text-slate-400 truncate">
+              {breadcrumb.section}
+            </span>
+            <span className="text-slate-300 text-xs">/</span>
+            <span className="text-xs font-extrabold text-slate-800 truncate" style={{ color: '#1B395F' }}>
+              {breadcrumb.page}
+            </span>
+          </div>
+
+          {/* Quick Search Bar */}
+          <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center relative max-w-xs lg:max-w-sm w-full ml-2">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={
+                isAdminLike ? 'Search UPI, listings, users...' :
+                isSeller ? 'Search your properties, UPI...' : 'Search verified land across Rwanda...'
               }
-              style={({ isActive }) => isActive
-                ? { background: 'linear-gradient(135deg, #1B395F 0%, #54B5BB 100%)', boxShadow: '0 2px 8px rgba(27,57,95,0.25)' }
-                : {}
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span className={`flex-shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400'}`}>
-                    {item.icon}
-                  </span>
-                  {item.label}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Spacer (mobile) */}
-        <div className="flex-1 lg:hidden" />
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-medium text-slate-800 placeholder-slate-400 rounded-full border border-slate-200 focus:border-[#54B5BB] focus:ring-2 focus:ring-[#54B5BB]/20 transition-all outline-none"
+            />
+          </form>
+        </div>
 
         {/* ── Right utilities ── */}
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
 
-          {/* Role badge — desktop only */}
-          <span className={`hidden xl:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border flex-shrink-0 mr-1 ${roleMeta.pill}`}>
+          {/* Primary Quick Action Button */}
+          {isSeller && (
+            <Link
+              to="/dashboard/properties/new"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white shadow-sm hover:opacity-95 transition-all"
+              style={{ background: 'linear-gradient(135deg, #1B395F 0%, #54B5BB 100%)' }}
+            >
+              <PlusCircle size={14} />
+              <span>Add Property</span>
+            </Link>
+          )}
+
+          {isBuyer && (
+            <Link
+              to="/properties"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white shadow-sm hover:opacity-95 transition-all"
+              style={{ background: 'linear-gradient(135deg, #1B395F 0%, #54B5BB 100%)' }}
+            >
+              <Compass size={14} />
+              <span>Browse Parcels</span>
+            </Link>
+          )}
+
+          {/* Role badge */}
+          <span className={`hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border flex-shrink-0 ${roleMeta.pill}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${roleMeta.dot} animate-pulse`} />
-            {roleMeta.label}
+            {roleMeta.badge}
           </span>
 
           {/* Unread message bubble */}
-          {(isSeller || isBuyer) && unreadMessages > 0 && (
-            <button
-              onClick={() => navigate(isSeller ? '/seller/inquiries' : '/messages')}
-              className="relative p-2 text-slate-400 hover:text-[#1B395F] hover:bg-[#1B395F]/8 rounded-xl transition-all"
-              title="Unread messages"
-            >
-              <MessageCircle size={19} />
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px]">
-                <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                <span className="relative inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-extrabold text-white">
-                  {unreadMessages > 9 ? '9+' : unreadMessages}
-                </span>
-              </span>
-            </button>
+          {(isSeller || isBuyer) && (
+            <Tooltip content={unreadMessages > 0 ? `${unreadMessages} unread messages` : 'Messages'} position="bottom" variant="dark">
+              <button
+                onClick={() => navigate(isSeller ? '/seller/inquiries' : '/messages')}
+                className="relative p-2 text-slate-400 hover:text-[#1B395F] hover:bg-[#1B395F]/8 rounded-xl transition-all cursor-pointer"
+                aria-label="Messages"
+              >
+                <MessageCircle size={19} />
+                {unreadMessages > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px]">
+                    <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                    <span className="relative inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-extrabold text-white">
+                      {unreadMessages > 9 ? '9+' : unreadMessages}
+                    </span>
+                  </span>
+                )}
+              </button>
+            </Tooltip>
           )}
 
           {/* Notification bell (admin) */}
           {isAdminLike && (
             <div className="relative" ref={notifRef}>
-              <button
-                onClick={() => setNotifOpen(v => !v)}
-                className="relative p-2 text-slate-400 hover:text-[#1B395F] hover:bg-[#1B395F]/8 rounded-xl transition-all"
-              >
-                <Bell size={19} />
-                {unreadNotif > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px]">
-                    <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#54B5BB' }} />
-                    <span className="relative inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-extrabold text-white" style={{ background: '#1B395F' }}>
-                      {unreadNotif > 9 ? '9+' : unreadNotif}
+              <Tooltip content="System Notifications" position="bottom" variant="dark">
+                <button
+                  onClick={() => setNotifOpen(v => !v)}
+                  className="relative p-2 text-slate-400 hover:text-[#1B395F] hover:bg-[#1B395F]/8 rounded-xl transition-all cursor-pointer"
+                  aria-label="Notifications"
+                >
+                  <Bell size={19} />
+                  {unreadNotif > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px]">
+                      <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#54B5BB' }} />
+                      <span className="relative inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-extrabold text-white" style={{ background: '#1B395F' }}>
+                        {unreadNotif > 9 ? '9+' : unreadNotif}
+                      </span>
                     </span>
-                  </span>
-                )}
-              </button>
+                  )}
+                </button>
+              </Tooltip>
 
               <AnimatePresence>
                 {notifOpen && (
@@ -255,7 +308,7 @@ const Topbar: React.FC = () => {
                       )}
                     </div>
                     <div className="max-h-72 overflow-y-auto custom-scrollbar">
-                      {notifications.length === 0 ? (
+                      {(notifications || []).length === 0 ? (
                         <div className="px-4 py-10 text-center">
                           <div className="w-10 h-10 rounded-2xl flex items-center justify-center mx-auto mb-3"
                             style={{ background: 'rgba(84,181,187,0.12)', color: '#54B5BB' }}>
@@ -263,7 +316,7 @@ const Topbar: React.FC = () => {
                           </div>
                           <p className="text-sm font-semibold text-slate-500">All caught up!</p>
                         </div>
-                      ) : notifications.slice(0, 8).map(n => (
+                      ) : (notifications || []).slice(0, 8).map(n => (
                         <button key={n.id} onClick={() => handleNotifClick(n)}
                           className={`w-full text-left px-5 py-3.5 border-b border-slate-50 last:border-0 flex items-start gap-3 transition-colors hover:bg-slate-50 ${!n.is_read ? 'bg-blue-50/40' : ''}`}
                         >
@@ -283,16 +336,31 @@ const Topbar: React.FC = () => {
           )}
 
           {/* Currency Switcher */}
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value as any)}
-            className="hidden sm:block px-2.5 py-1 text-xs font-extrabold rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 focus:outline-none transition-all cursor-pointer"
-          >
-            <option value="RWF">RWF</option>
-            <option value="USD">USD ($)</option>
-            <option value="EUR">EUR (€)</option>
-            <option value="GBP">GBP (£)</option>
-          </select>
+          <div className="relative">
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value as any)}
+              className="px-2.5 py-1.5 text-xs font-extrabold rounded-full bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-700 focus:outline-none transition-all cursor-pointer"
+              title="Change Display Currency"
+            >
+              <option value="RWF">RWF (Frw)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="GBP">GBP (£)</option>
+            </select>
+          </div>
+
+          {/* Public Site Link */}
+          <Tooltip content="Open Public Marketplace" position="bottom" variant="dark">
+            <Link
+              to="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden md:flex p-2 text-slate-400 hover:text-[#1B395F] hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+            >
+              <ExternalLink size={17} />
+            </Link>
+          </Tooltip>
 
           {/* Divider */}
           <div className="h-6 w-px bg-slate-200 mx-1" />
@@ -301,14 +369,14 @@ const Topbar: React.FC = () => {
           <div className="relative z-50" ref={profileRef}>
             <button
               onClick={() => setProfileOpen(v => !v)}
-              className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all group cursor-pointer"
+              className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all group cursor-pointer"
             >
               <Avatar src={user?.photoUrl} name={user?.fullName ?? 'User'} size="sm" />
               <div className="hidden sm:flex flex-col items-start min-w-0 max-w-[110px]">
                 <span className="text-[12px] font-extrabold truncate leading-tight transition-colors group-hover:text-[#1B395F]" style={{ color: '#1B395F' }}>
                   {user?.fullName ?? 'User'}
                 </span>
-                <span className="text-[10px] font-medium text-slate-400 truncate">{roleMeta.label}</span>
+                <span className="text-[10px] font-medium text-slate-400 truncate">{roleMeta.badge}</span>
               </div>
               <ChevronDown size={13} className={`text-slate-400 transition-transform hidden sm:block ${profileOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -357,63 +425,8 @@ const Topbar: React.FC = () => {
               )}
             </AnimatePresence>
           </div>
-
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMobileOpen(v => !v)}
-            className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-xl transition-all ml-1"
-          >
-            {mobileOpen ? <X size={19} /> : <Menu size={19} />}
-          </button>
         </div>
       </div>
-
-      {/* ═══ Mobile nav slide-down ═══ */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            ref={mobileRef as React.RefObject<HTMLDivElement>}
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-            className="lg:hidden border-t border-slate-200/80 bg-white overflow-hidden"
-          >
-            <nav className="flex flex-col gap-1 p-3">
-              {navItems.map(item => (
-                <NavLink
-                  key={item.to} to={item.to} end
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
-                      isActive ? 'text-white' : 'text-slate-600 hover:bg-slate-100'
-                    }`
-                  }
-                  style={({ isActive }) => isActive
-                    ? { background: 'linear-gradient(135deg, #1B395F 0%, #54B5BB 100%)' }
-                    : {}
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <span className={isActive ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
-                      {item.label}
-                    </>
-                  )}
-                </NavLink>
-              ))}
-              <div className="my-1.5 h-px bg-slate-100 mx-2" />
-              <button
-                onClick={() => { setMobileOpen(false); logout(); navigate('/login', { replace: true }); }}
-                className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-all text-left cursor-pointer"
-              >
-                <LogOut size={15} className="text-rose-500" />
-                Sign Out
-              </button>
-            </nav>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </header>
   );
 };

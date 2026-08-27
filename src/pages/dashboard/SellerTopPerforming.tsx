@@ -30,19 +30,20 @@ export const SellerTopPerforming: React.FC = () => {
     useEffect(() => {
         listingsApi
             .getMyListings()
-            .then((res) => setListings(res.listings))
+            .then((res) => setListings(res?.listings || []))
+            .catch(() => setListings([]))
             .finally(() => setLoading(false));
     }, []);
 
     const ranked: RankedListing[] = useMemo(
-        () => [...listings]
-            .sort((a, b) => b.view_count - a.view_count)
+        () => [...(listings || [])]
+            .sort((a, b) => (b.view_count || 0) - (a.view_count || 0))
             .map((l, i) => ({ ...l, rank: i + 1 })),
         [listings]
     );
 
-    const totalViews = listings.reduce((sum, l) => sum + l.view_count, 0);
-    const approvedCount = listings.filter((l) => l.status === 'approved').length;
+    const totalViews = (listings || []).reduce((sum, l) => sum + (l.view_count || 0), 0);
+    const approvedCount = (listings || []).filter((l) => l.status === 'approved').length;
 
     const openDrawer = (listing: RankedListing) => {
         setSelected(listing);

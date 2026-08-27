@@ -4,6 +4,33 @@ import * as authApi from '@/api/auth';
 import type { BackendRole, BackendUser } from '@/api/types';
 
 const IMPERSONATOR_TOKEN_KEY = 'gw_impersonator_token';
+const AUTH_USER_KEY = 'gw_auth_user';
+
+function getStoredAuthUser(): AuthUser | null {
+  try {
+    const raw = localStorage.getItem(AUTH_USER_KEY) || sessionStorage.getItem(AUTH_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setStoredAuthUser(user: AuthUser | null, remember: boolean): void {
+  try {
+    localStorage.removeItem(AUTH_USER_KEY);
+    sessionStorage.removeItem(AUTH_USER_KEY);
+    if (user) {
+      (remember ? localStorage : sessionStorage).setItem(AUTH_USER_KEY, JSON.stringify(user));
+    }
+  } catch {}
+}
+
+function clearStoredAuthUser(): void {
+  try {
+    localStorage.removeItem(AUTH_USER_KEY);
+    sessionStorage.removeItem(AUTH_USER_KEY);
+  } catch {}
+}
 
 // ── Role definitions ──────────────────────────────────────────────────────────
 export type UserRole = 'Administrator' | 'SubAdmin' | 'Seller' | 'Buyer';
@@ -80,21 +107,28 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(() => getStoredAuthUser());
+  const [isLoading, setIsLoading] = useState(() => !getStoredAuthUser() && !!getToken());
   const [isImpersonating, setIsImpersonating] = useState(() => !!sessionStorage.getItem(IMPERSONATOR_TOKEN_KEY));
 
   useEffect(() => {
     const token = getToken();
     if (!token) {
+      clearStoredAuthUser();
+      setUser(null);
       setIsLoading(false);
       return;
     }
     authApi
       .getMe()
-      .then(({ user }) => setUser(toAuthUser(user)))
+      .then(({ user: backendUser }) => {
+        const authUser = toAuthUser(backendUser);
+        setUser(authUser);
+        setStoredAuthUser(authUser, true);
+      })
       .catch(() => {
         clearToken();
+        clearStoredAuthUser();
         setUser(null);
       })
       .finally(() => setIsLoading(false));
@@ -106,9 +140,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     remember = true
   ): Promise<{ success: boolean; error?: string; role?: UserRole }> => {
     try {
-      const { user, token } = await authApi.login(email, password);
+      const { user: backendUser, token } = await authApi.login(email, password);
       setToken(token, remember);
-      const authUser = toAuthUser(user);
+      const authUser = toAuthUser(backendUser);
+      setStoredAuthUser(authUser, remember);
       setUser(authUser);
       return { success: true, role: authUser.role };
     } catch (err) {
@@ -121,7 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     input: RegisterInput
   ): Promise<{ success: boolean; error?: string; role?: UserRole }> => {
     try {
-      const { user, token } = await authApi.register({
+      const { user: backendUser, token } = await authApi.register({
         full_name: input.fullName,
         email: input.email,
         password: input.password,
@@ -129,7 +164,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: FRONTEND_TO_BACKEND_ROLE[input.role],
       });
       setToken(token, true);
-      const authUser = toAuthUser(user);
+      const authUser = toAuthUser(backendUser);
+      setStoredAuthUser(authUser, true);
       setUser(authUser);
       return { success: true, role: authUser.role };
     } catch (err) {
@@ -146,12 +182,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): Promise<{ success: boolean; error?: string; role?: UserRole }> => {
     try {
       setToken(token, true);
-      const { user } = await authApi.getMe();
-      const authUser = toAuthUser(user);
+      const { user: backendUser } = await authApi.getMe();
+      const authUser = toAuthUser(backendUser);
+      setStoredAuthUser(authUser, true);
       setUser(authUser);
       return { success: true, role: authUser.role };
     } catch (err) {
       clearToken();
+      clearStoredAuthUser();
       const message = err instanceof ApiError ? err.message : 'Something went wrong signing you in.';
       return { success: false, error: message };
     }
@@ -161,6 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem(IMPERSONATOR_TOKEN_KEY);
     setIsImpersonating(false);
     clearToken();
+    clearStoredAuthUser();
     setUser(null);
   }, []);
 
@@ -173,10 +212,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!currentToken) return { success: false, error: 'No active session to impersonate from.' };
     try {
       setToken(token, false); // impersonated sessions never persist past this tab/session
-      const { user } = await authApi.getMe();
+      const { user: backendUser } = await authApi.getMe();
       sessionStorage.setItem(IMPERSONATOR_TOKEN_KEY, currentToken);
       setIsImpersonating(true);
-      const authUser = toAuthUser(user);
+      const authUser = toAuthUser(backendUser);
+      setStoredAuthUser(authUser, false);
       setUser(authUser);
       return { success: true, role: authUser.role };
     } catch (err) {
@@ -192,10 +232,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!stashed) return { success: false, error: 'Not currently impersonating anyone.' };
     try {
       setToken(stashed, true);
-      const { user } = await authApi.getMe();
+      const { user: backendUser } = await authApi.getMe();
       sessionStorage.removeItem(IMPERSONATOR_TOKEN_KEY);
       setIsImpersonating(false);
-      const authUser = toAuthUser(user);
+      const authUser = toAuthUser(backendUser);
+      setStoredAuthUser(authUser, true);
       setUser(authUser);
       return { success: true, role: authUser.role };
     } catch (err) {
@@ -203,6 +244,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sessionStorage.removeItem(IMPERSONATOR_TOKEN_KEY);
       setIsImpersonating(false);
       clearToken();
+      clearStoredAuthUser();
       setUser(null);
       return { success: false, error: message };
     }
@@ -211,8 +253,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshUser = useCallback(async () => {
     if (!getToken()) return;
     try {
-      const { user } = await authApi.getMe();
-      setUser(toAuthUser(user));
+      const { user: backendUser } = await authApi.getMe();
+      const authUser = toAuthUser(backendUser);
+      setUser(authUser);
+      setStoredAuthUser(authUser, true);
     } catch {
       // ignore transient refresh failures
     }

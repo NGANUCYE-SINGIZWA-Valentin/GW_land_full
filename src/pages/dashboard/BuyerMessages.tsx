@@ -35,7 +35,8 @@ export const BuyerMessages: React.FC = () => {
     const loadInbox = (silent = false) => {
         if (!silent) setLoading(true);
         messagesApi.getInbox()
-            .then((res) => setConversations(res.conversations))
+            .then((res) => setConversations(res?.conversations || []))
+            .catch(() => setConversations([]))
             .finally(() => { if (!silent) setLoading(false); });
     };
 

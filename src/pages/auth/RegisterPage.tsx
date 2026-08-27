@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'framer-motion';
 import GWLandLogo from '@/components/ui/GWLandLogo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { Mail, Lock, User, Phone } from 'lucide-react';
+import { Mail, Lock, User, Phone, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RoleSelector } from '@/components/auth/RoleSelector';
 import { useAuth, ROLE_REDIRECTS, type UserRole } from '@/components/auth/AuthContext';
@@ -12,11 +13,18 @@ import { googleAuthUrl, facebookAuthUrl } from '@/api/auth';
 export const RegisterPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, register } = useAuth();
   const [error, setError] = useState('');
   const [role, setRole] = useState<UserRole | ''>('');
   const [roleError, setRoleError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // If already authenticated, redirect straight to the destination dashboard
+  useEffect(() => {
+    if (isAuthenticated && user?.role && !authLoading) {
+      navigate(ROLE_REDIRECTS[user.role] || '/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, user, authLoading, navigate]);
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -52,9 +60,8 @@ export const RegisterPage: React.FC = () => {
 
     setLoading(true);
     const result = await register({ fullName, email, phone, password, role });
-    setLoading(false);
-
     if (!result.success) {
+      setLoading(false);
       setError(result.error ?? t('auth.registrationFailed'));
       return;
     }
@@ -70,10 +77,30 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-7 flex flex-col justify-center transition-all duration-300 shadow-none">
+    <motion.div 
+      initial={{ opacity: 0, y: 16, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+      className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-7 flex flex-col justify-center transition-all duration-300 shadow-xl overflow-hidden"
+    >
+      {loading && (
+        <div className="absolute top-0 left-0 right-0 h-1 bg-slate-100 dark:bg-slate-800 overflow-hidden">
+          <motion.div
+            initial={{ x: '-100%' }}
+            animate={{ x: '100%' }}
+            transition={{ repeat: Infinity, duration: 1.1, ease: 'easeInOut' }}
+            className="h-full w-1/2 bg-gradient-to-r from-[#54B5BB] via-[#1B395F] to-[#54B5BB]"
+          />
+        </div>
+      )}
 
       {/* Clickable Logo and Heading */}
-      <div className="mb-4 flex flex-col items-center text-center">
+      <motion.div 
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.32, delay: 0.05 }}
+        className="mb-4 flex flex-col items-center text-center"
+      >
         <Link to="/" className="mb-2 inline-block hover:scale-105 transition-transform duration-200" title="Go to home page">
           <GWLandLogo className="h-6 sm:h-7 w-auto max-w-[80px] object-contain" />
         </Link>
@@ -83,21 +110,35 @@ export const RegisterPage: React.FC = () => {
         <p className="text-slate-600 dark:text-slate-400 font-semibold text-xs">
           {t('auth.joinToday')}
         </p>
-      </div>
+      </motion.div>
 
-      {error && (
-        <div className="mb-3 p-2.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl border border-red-100 dark:border-red-900/30">
-          {error}
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0, y: -6 }}
+            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -6 }}
+            className="mb-3 p-2.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl border border-red-100 dark:border-red-900/30"
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <form className="space-y-3" onSubmit={handleRegister}>
+      <motion.form 
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.32, delay: 0.1 }}
+        className="space-y-3" 
+        onSubmit={handleRegister}
+      >
         <Input
           label={t('auth.fullName')}
           name="fullName"
           placeholder="John Doe"
           type="text"
           icon={<User size={16} />}
+          disabled={loading}
           required
         />
 
@@ -107,6 +148,7 @@ export const RegisterPage: React.FC = () => {
           placeholder="johndoe@example.com"
           type="email"
           icon={<Mail size={16} />}
+          disabled={loading}
           required
         />
 
@@ -116,6 +158,7 @@ export const RegisterPage: React.FC = () => {
           placeholder="+250 ..."
           type="tel"
           icon={<Phone size={16} />}
+          disabled={loading}
           required
         />
 
@@ -125,6 +168,7 @@ export const RegisterPage: React.FC = () => {
           placeholder={t('auth.passwordAtLeast8')}
           type="password"
           icon={<Lock size={16} />}
+          disabled={loading}
           required
         />
 
@@ -134,6 +178,7 @@ export const RegisterPage: React.FC = () => {
           placeholder="••••••••"
           type="password"
           icon={<Lock size={16} />}
+          disabled={loading}
           required
         />
 
@@ -145,6 +190,7 @@ export const RegisterPage: React.FC = () => {
             <input
               type="checkbox"
               required
+              disabled={loading}
               className="w-3.5 h-3.5 rounded border-gray-300 dark:border-slate-700 text-brand-primary focus:ring-brand-primary mt-0.5 cursor-pointer bg-white dark:bg-slate-800"
             />
             <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors leading-relaxed">
@@ -159,15 +205,27 @@ export const RegisterPage: React.FC = () => {
         <Button
           type="submit"
           variant="primary"
-          className="w-full py-3 rounded-xl text-xs sm:text-sm font-extrabold bg-brand-primary hover:bg-brand-primary-hover dark:bg-brand-secondary dark:text-slate-900 dark:hover:bg-brand-secondary-hover shadow-none mt-1"
+          className="w-full py-3 rounded-xl text-xs sm:text-sm font-extrabold bg-brand-primary hover:bg-brand-primary-hover dark:bg-brand-secondary dark:text-slate-900 dark:hover:bg-brand-secondary-hover shadow-none mt-1 flex items-center justify-center gap-2"
           disabled={loading}
         >
-          {loading ? t('auth.creatingAccount') : t('auth.createAccount')}
+          {loading ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              <span>{t('auth.creatingAccount') || 'Creating account...'}</span>
+            </>
+          ) : (
+            t('auth.createAccount')
+          )}
         </Button>
-      </form>
+      </motion.form>
 
       {/* Divider */}
-      <div className="relative my-3.5">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.32, delay: 0.15 }}
+        className="relative my-3.5"
+      >
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t border-slate-200 dark:border-slate-800" />
         </div>
@@ -176,14 +234,19 @@ export const RegisterPage: React.FC = () => {
             {t('auth.or')}
           </span>
         </div>
-      </div>
+      </motion.div>
 
       {/* Social Buttons */}
-      <div className="flex flex-col space-y-2">
+      <motion.div 
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.32, delay: 0.2 }}
+        className="flex flex-col space-y-2"
+      >
         <a
           href={googleAuthUrl(role === 'Seller' ? 'seller' : 'buyer')}
           onClick={handleSocialClick}
-          className="flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer w-full shadow-none"
+          className={`flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer w-full shadow-none ${loading ? 'pointer-events-none opacity-60' : ''}`}
         >
           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -197,22 +260,29 @@ export const RegisterPage: React.FC = () => {
         <a
           href={facebookAuthUrl(role === 'Seller' ? 'seller' : 'buyer')}
           onClick={handleSocialClick}
-          className="flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer w-full shadow-none"
+          className={`flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer w-full shadow-none ${loading ? 'pointer-events-none opacity-60' : ''}`}
         >
           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" fill="#1877F2"/>
           </svg>
           {t('auth.continueWithFacebook')}
         </a>
-      </div>
+      </motion.div>
 
-      <p className="text-center mt-8 text-xs sm:text-sm font-bold text-gray-500 dark:text-slate-400">
+      <motion.p 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.32, delay: 0.25 }}
+        className="text-center mt-8 text-xs sm:text-sm font-bold text-gray-500 dark:text-slate-400"
+      >
         {t('auth.haveAccount')}{' '}
         <Link to="/login" className="text-brand-primary dark:text-brand-secondary font-extrabold hover:underline">
           {t('auth.logIn')}
         </Link>
-      </p>
+      </motion.p>
 
-    </div>
+    </motion.div>
   );
 };
+
+export default RegisterPage;

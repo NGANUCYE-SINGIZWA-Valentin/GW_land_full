@@ -13,11 +13,13 @@ import * as listingsApi from '@/api/listings';
 import { adaptListingSummary } from '@/utils/listingAdapters';
 import type { Property } from '@/types/property';
 
-export const Highlight: React.FC<{ text: string; query: string }> = ({ text, query }) => {
-  if (!query.trim()) return <>{text}</>;
-  const index = text.toLowerCase().indexOf(query.toLowerCase());
-  if (index === -1) return <>{text}</>;
-  return <>{text.slice(0, index)}<mark className="rounded bg-[#fff0df] px-0.5 text-[#b35b08]">{text.slice(index, index + query.length)}</mark>{text.slice(index + query.length)}</>;
+export const Highlight: React.FC<{ text?: string; query?: string }> = ({ text = '', query = '' }) => {
+  if (!text) return null;
+  if (!query || !query.trim()) return <>{text}</>;
+  const safeText = String(text);
+  const index = safeText.toLowerCase().indexOf(query.toLowerCase());
+  if (index === -1) return <>{safeText}</>;
+  return <>{safeText.slice(0, index)}<mark className="rounded bg-[#fff0df] px-0.5 text-[#b35b08]">{safeText.slice(index, index + query.length)}</mark>{safeText.slice(index + query.length)}</>;
 };
 
 interface FilterFormProps {

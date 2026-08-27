@@ -45,7 +45,7 @@ export const FeaturedListings: React.FC = () => {
             ? Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="h-64 animate-pulse rounded-3xl bg-slate-200/70 dark:bg-slate-800/60" />
               ))
-            : properties.slice(0, 9).map((prop, idx) => (
+            : (properties || []).slice(0, 9).map((prop, idx) => (
                 <ScrollReveal key={prop.id} delay={idx * 75}>
                   <PropertyCard property={prop} />
                 </ScrollReveal>

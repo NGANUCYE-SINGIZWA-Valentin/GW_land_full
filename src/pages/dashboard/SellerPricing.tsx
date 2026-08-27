@@ -10,10 +10,13 @@ import { ApiError } from '@/api/client';
 import type { Payment, PricingPlan, PaymentProvider, PlanKey } from '@/api/types';
 import type { MyListing } from '@/api/types';
 
-const STATUS_BADGE: Record<Payment['status'], { bg: string; icon: React.ReactNode; label: string }> = {
+const STATUS_BADGE: Record<string, { bg: string; icon: React.ReactNode; label: string }> = {
     completed: { bg: 'bg-emerald-50 border-emerald-100 text-emerald-600', icon: <CheckCircle2 size={14} />, label: 'Completed' },
+    confirmed: { bg: 'bg-emerald-50 border-emerald-100 text-emerald-600', icon: <CheckCircle2 size={14} />, label: 'Completed' },
+    approved: { bg: 'bg-emerald-50 border-emerald-100 text-emerald-600', icon: <CheckCircle2 size={14} />, label: 'Completed' },
     pending: { bg: 'bg-amber-50 border-amber-100 text-amber-600', icon: <Clock size={14} />, label: 'Awaiting confirmation' },
     failed: { bg: 'bg-red-50 border-red-100 text-red-600', icon: <XCircle size={14} />, label: 'Failed' },
+    rejected: { bg: 'bg-red-50 border-red-100 text-red-600', icon: <XCircle size={14} />, label: 'Rejected' },
 };
 
 const PROVIDER_OPTIONS: { value: PaymentProvider; label: string; icon: React.ReactNode }[] = [
@@ -103,7 +106,12 @@ export const SellerPricing: React.FC = () => {
         {
             header: 'Status',
             render: (p) => {
-                const c = STATUS_BADGE[p.status];
+                const statusKey = String(p.status || 'pending').toLowerCase();
+                const c = STATUS_BADGE[statusKey] || {
+                    bg: 'bg-slate-100 border-slate-200 text-slate-600',
+                    icon: <Clock size={14} />,
+                    label: p.status || 'Unknown',
+                };
                 return (
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-tight antialiased border ${c.bg}`}>
                         {c.icon} {c.label}

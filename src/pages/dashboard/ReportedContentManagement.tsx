@@ -4,6 +4,7 @@ import { TableBlueprint, ColumnConfig } from '@/components/dashboard/TableBluepr
 import { DrawerBlueprint } from '@/components/dashboard/DrawerBlueprint';
 import { AlertDialog } from '@/components/ui/AlertDialog';
 import { DashboardButton } from '@/components/ui/DashboardButton';
+import { Tooltip, TruncatedCellTooltip } from '@/components/ui/Tooltip';
 import {
     Flag,
     CheckCircle2,
@@ -59,7 +60,7 @@ export const ReportedContentManagement: React.FC = () => {
     const loadReports = () => {
         setLoading(true);
         adminApi.getReports()
-            .then((res) => setReports(res.reports))
+            .then((res) => setReports(res?.reports || []))
             .catch(() => setError('Failed to load reports.'))
             .finally(() => setLoading(false));
     };
@@ -123,38 +124,85 @@ export const ReportedContentManagement: React.FC = () => {
     const columns: ColumnConfig<Report>[] = [
         {
             header: 'Listing',
+            accessorKey: 'listing_title',
+            tooltip: 'The flagged property parcel reported by users.',
             render: (r) => (
                 <div className="flex flex-col min-w-0">
-                    <span className="text-base font-medium tracking-tight text-slate-700 truncate max-w-[180px]">
-                        {r.listing_title || 'Listing removed'}
-                    </span>
-                    <span className="text-xs text-slate-400 font-normal">{r.listing_slug}</span>
+                    <TruncatedCellTooltip
+                        text={r.listing_title || 'Listing removed'}
+                        fullText={r.listing_title || 'Listing removed'}
+                        subtext={r.listing_slug ? `Slug: ${r.listing_slug}` : 'No active slug'}
+                        maxWidthClass="max-w-[180px]"
+                    />
+                    <span className="text-xs text-slate-400 font-normal truncate max-w-[180px]">{r.listing_slug}</span>
                 </div>
             ),
         },
         {
             header: 'Reason',
+            accessorKey: 'reason_category',
+            tooltip: 'Category and descriptive note provided by the reporter.',
             render: (r) => (
-                <span className="text-slate-700 text-base font-medium tracking-tight antialiased truncate block max-w-[240px]" title={r.reason || undefined}>
-                    {REASON_LABEL[r.reason_category]}
-                </span>
+                <TruncatedCellTooltip
+                    text={REASON_LABEL[r.reason_category] || r.reason_category}
+                    fullText={r.reason ? `${REASON_LABEL[r.reason_category]}: "${r.reason}"` : REASON_LABEL[r.reason_category]}
+                    subtext={r.reason ? `Notes: ${r.reason}` : 'No additional notes provided.'}
+                    maxWidthClass="max-w-[220px]"
+                />
             ),
         },
-        { header: 'Reporter', render: (r) => r.reporter_email || 'Registered user', cellClassName: 'text-slate-700 text-base font-medium tracking-tight antialiased' },
-        { header: 'Date', render: (r) => new Date(r.created_at).toLocaleDateString(), cellClassName: 'text-slate-700 text-base font-medium tracking-tight antialiased' },
+        {
+            header: 'Reporter',
+            accessorKey: 'reporter_email',
+            tooltip: 'Contact email of the reporting account.',
+            render: (r) => (
+                <TruncatedCellTooltip
+                    text={r.reporter_email || 'Registered user'}
+                    fullText={r.reporter_email || 'Registered user'}
+                    allowCopy={!!r.reporter_email}
+                    badge="Reporter"
+                    maxWidthClass="max-w-[170px]"
+                />
+            ),
+        },
+        {
+            header: 'Date',
+            accessorKey: 'created_at',
+            tooltip: 'Report submission timestamp.',
+            render: (r) => (
+                <Tooltip content={`Reported on ${new Date(r.created_at).toLocaleString()}`} position="top" variant="dark">
+                    <span className="text-slate-700 text-sm font-medium tracking-tight antialiased cursor-default">
+                        {new Date(r.created_at).toLocaleDateString()}
+                    </span>
+                </Tooltip>
+            ),
+        },
         {
             header: 'Status',
+            accessorKey: 'status',
+            tooltip: 'Moderation review status.',
             render: (r) => (
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-tight antialiased border ${STATUS_STYLE[r.status]}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[r.status]}`} />
-                    {r.status}
-                </span>
+                <Tooltip
+                    content={
+                        r.status === 'reviewed' ? 'Report reviewed and resolved by admin' :
+                        r.status === 'pending' ? 'Requires inspection and verification' : 'Report dismissed as invalid'
+                    }
+                    position="top"
+                    variant={r.status === 'pending' ? 'dark' : 'brand'}
+                >
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-tight antialiased border cursor-default ${STATUS_STYLE[r.status] || 'bg-slate-100 border-slate-200 text-slate-500'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[r.status] || 'bg-slate-400'}`} />
+                        {r.status}
+                    </span>
+                </Tooltip>
             ),
         },
         {
             header: 'Action',
+            accessorKey: 'id',
             headerClassName: 'text-right',
             cellClassName: 'text-right',
+            tooltip: 'Inspect report evidence, review listing, or dismiss.',
             render: (r) => (
                 <button
                     onClick={() => openDrawer(r)}
@@ -306,8 +354,8 @@ export const ReportedContentManagement: React.FC = () => {
                                     <Flag size={16} />
                                     <span className="text-xs font-medium">Status</span>
                                 </div>
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_STYLE[selectedReport.status]}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[selectedReport.status]}`} />
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_STYLE[selectedReport.status] || 'bg-slate-100 border-slate-200 text-slate-500'}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[selectedReport.status] || 'bg-slate-400'}`} />
                                     {selectedReport.status}
                                 </span>
                             </div>

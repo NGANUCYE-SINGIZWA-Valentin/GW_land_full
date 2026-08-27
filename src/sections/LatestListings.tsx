@@ -57,7 +57,7 @@ export const LatestListings: React.FC = () => {
               ? Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="h-64 animate-pulse rounded-3xl bg-slate-200/70" />
                 ))
-              : properties.slice(0, 8).map((property) => (
+              : (properties || []).slice(0, 8).map((property) => (
                   <PropertyCard key={property.id} property={property} variant="public" />
                 ))}
           </div>

@@ -3,21 +3,34 @@ import { useNavigate } from 'react-router-dom';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { TableBlueprint, ColumnConfig } from '@/components/dashboard/TableBlueprint';
 import { DrawerBlueprint } from '@/components/dashboard/DrawerBlueprint';
-import { ActionDropdown } from '@/components/dashboard/ActionDropdown';
+import { PropertyCard } from '@/components/dashboard/PropertyCard';
 import { AlertDialog } from '@/components/ui/AlertDialog';
 import { DashboardButton } from '@/components/ui/DashboardButton';
 import { Field, Input, TextArea } from '@/components/wizard/FormField';
 import {
-    Home,
-    CheckCircle2,
-    Tag,
-    Clock,
-    DollarSign,
-    Maximize2,
-    MapPin,
-    Eye,
-    Edit2,
-    Trash2,
+  Tooltip,
+  PropertyStatusBadgeTooltip,
+  TruncatedCellTooltip,
+} from '@/components/ui/Tooltip';
+import {
+  Home,
+  CheckCircle2,
+  Tag,
+  Clock,
+  DollarSign,
+  Maximize2,
+  MapPin,
+  Eye,
+  Edit2,
+  Trash2,
+  LayoutGrid,
+  List,
+  Search,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Building2,
+  TrendingUp,
 } from 'lucide-react';
 import { useCurrency } from '@/context/CurrencyContext';
 import * as listingsApi from '@/api/listings';
@@ -25,392 +38,503 @@ import { ApiError } from '@/api/client';
 import type { MyListing, ListingStatus } from '@/api/types';
 
 type KpiFilter = 'all' | 'pending' | 'approved' | 'sold';
+type ViewMode = 'grid' | 'table';
 
 const STATUS_LABEL: Record<ListingStatus, string> = {
-    pending: 'Pending',
-    approved: 'Live',
-    rejected: 'Rejected',
-    sold: 'Sold',
+  pending: 'Pending',
+  approved: 'Live',
+  rejected: 'Rejected',
+  sold: 'Sold',
 };
 
 const STATUS_STYLE: Record<ListingStatus, string> = {
-    approved: 'bg-emerald-50 border-emerald-100 text-emerald-600',
-    pending: 'bg-amber-50 border-amber-100 text-amber-600',
-    sold: 'bg-blue-50 border-blue-100 text-blue-600',
-    rejected: 'bg-red-50 border-red-100 text-red-600',
+  approved: 'bg-emerald-50 border-emerald-100 text-emerald-600',
+  pending: 'bg-amber-50 border-amber-100 text-amber-600',
+  sold: 'bg-blue-50 border-blue-100 text-blue-600',
+  rejected: 'bg-red-50 border-red-100 text-red-600',
 };
 
 const STATUS_DOT: Record<ListingStatus, string> = {
-    approved: 'bg-emerald-500',
-    pending: 'bg-amber-500',
-    sold: 'bg-blue-500',
-    rejected: 'bg-red-500',
+  approved: 'bg-emerald-500',
+  pending: 'bg-amber-500',
+  sold: 'bg-blue-500',
+  rejected: 'bg-red-500',
 };
 
 const formatSize = (l: MyListing): string => `${Number(l.size_value).toLocaleString()} ${l.size_unit === 'hectare' ? 'ha' : 'sqm'}`;
 
 export const SellerPropertyManagement: React.FC = () => {
-    const navigate = useNavigate();
-    const { formatCurrency } = useCurrency();
+  const navigate = useNavigate();
+  const { formatCurrency } = useCurrency();
 
-    const [listings, setListings] = useState<MyListing[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+  const [listings, setListings] = useState<MyListing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeKpiFilter, setActiveKpiFilter] = useState<KpiFilter>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [searchQuery, setSearchQuery] = useState('');
 
-    const loadListings = () => {
-        setLoading(true);
-        setError('');
-        listingsApi
-            .getMyListings()
-            .then((res) => setListings(res.listings))
-            .catch((err) => {
-                const msg = err?.message || 'Failed to load your properties.';
-                setError(msg);
-            })
-            .finally(() => setLoading(false));
-    };
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<MyListing | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', description: '', price_rwf: '', price_usd: '', size_value: '' });
+  const [isSaving, setIsSaving] = useState(false);
+  const [actionError, setActionError] = useState('');
 
-    useEffect(() => {
-        loadListings();
-    }, []);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [listingToDelete, setListingToDelete] = useState<MyListing | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-    const [activeKpiFilter, setActiveKpiFilter] = useState<KpiFilter>('all');
+  const loadListings = () => {
+    setLoading(true);
+    setError('');
+    listingsApi
+      .getMyListings()
+      .then((res) => setListings(res?.listings || []))
+      .catch((err) => {
+        const msg = err?.message || 'Failed to load your properties.';
+        setError(msg);
+      })
+      .finally(() => setLoading(false));
+  };
 
-    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const [selectedListing, setSelectedListing] = useState<MyListing | null>(null);
-    const [editMode, setEditMode] = useState(false);
-    const [editForm, setEditForm] = useState({ title: '', description: '', price_rwf: '', price_usd: '', size_value: '' });
-    const [isSaving, setIsSaving] = useState(false);
-    const [actionError, setActionError] = useState('');
+  useEffect(() => {
+    loadListings();
+  }, []);
 
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [listingToDelete, setListingToDelete] = useState<MyListing | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
+  const kpiCounts = useMemo(() => ({
+    all: listings.length,
+    pending: listings.filter((l) => l.status === 'pending').length,
+    approved: listings.filter((l) => l.status === 'approved').length,
+    sold: listings.filter((l) => l.status === 'sold').length,
+  }), [listings]);
 
-    const kpiCounts = useMemo(() => ({
-        all: listings.length,
-        pending: listings.filter((l) => l.status === 'pending').length,
-        approved: listings.filter((l) => l.status === 'approved').length,
-        sold: listings.filter((l) => l.status === 'sold').length,
-    }), [listings]);
+  const filteredListings = useMemo(() => {
+    let result = listings;
+    if (activeKpiFilter === 'pending') result = result.filter((l) => l.status === 'pending');
+    else if (activeKpiFilter === 'approved') result = result.filter((l) => l.status === 'approved');
+    else if (activeKpiFilter === 'sold') result = result.filter((l) => l.status === 'sold');
 
-    const filteredListings = useMemo(() => {
-        switch (activeKpiFilter) {
-            case 'pending': return listings.filter((l) => l.status === 'pending');
-            case 'approved': return listings.filter((l) => l.status === 'approved');
-            case 'sold': return listings.filter((l) => l.status === 'sold');
-            default: return listings;
-        }
-    }, [listings, activeKpiFilter]);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((l) =>
+        l.title.toLowerCase().includes(q) ||
+        (l.upi && l.upi.toLowerCase().includes(q)) ||
+        l.district.toLowerCase().includes(q) ||
+        l.sector.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [listings, activeKpiFilter, searchQuery]);
 
-    const openEdit = (listing: MyListing) => {
-        setSelectedListing(listing);
-        setEditForm({
-            title: listing.title,
-            description: listing.description,
-            price_rwf: listing.price_rwf ? String(listing.price_rwf) : '',
-            price_usd: listing.price_usd ? String(listing.price_usd) : '',
-            size_value: String(listing.size_value),
-        });
-        setEditMode(true);
-        setActionError('');
-        setIsDrawerOpen(true);
-    };
+  const openEdit = (listing: MyListing) => {
+    setSelectedListing(listing);
+    setEditForm({
+      title: listing.title,
+      description: listing.description || '',
+      price_rwf: listing.price_rwf ? String(listing.price_rwf) : '',
+      price_usd: listing.price_usd ? String(listing.price_usd) : '',
+      size_value: String(listing.size_value || ''),
+    });
+    setActionError('');
+    setIsDrawerOpen(true);
+  };
 
-    const handleSaveEdit = async () => {
-        if (!selectedListing) return;
-        setIsSaving(true);
-        setActionError('');
-        try {
-            await listingsApi.updateListing(selectedListing.id, {
-                title: editForm.title,
-                description: editForm.description,
-                price_rwf: editForm.price_rwf ? Number(editForm.price_rwf) : undefined,
-                price_usd: editForm.price_usd ? Number(editForm.price_usd) : undefined,
-                size_value: editForm.size_value ? Number(editForm.size_value) : undefined,
-            });
-            setIsDrawerOpen(false);
-            loadListings();
-        } catch (err) {
-            setActionError(err instanceof ApiError ? err.message : 'Failed to save changes.');
-        } finally {
-            setIsSaving(false);
-        }
-    };
+  const handleSaveEdit = async () => {
+    if (!selectedListing) return;
+    setIsSaving(true);
+    setActionError('');
+    try {
+      await listingsApi.updateListing(selectedListing.id, {
+        title: editForm.title,
+        description: editForm.description,
+        price_rwf: editForm.price_rwf ? Number(editForm.price_rwf) : undefined,
+        price_usd: editForm.price_usd ? Number(editForm.price_usd) : undefined,
+        size_value: editForm.size_value ? Number(editForm.size_value) : undefined,
+      });
+      setIsDrawerOpen(false);
+      loadListings();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Failed to save changes.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-    const handleMarkSold = async (listing: MyListing) => {
-        try {
-            await listingsApi.markListingSold(listing.id);
-            setIsDrawerOpen(false);
-            loadListings();
-        } catch (err) {
-            setActionError(err instanceof ApiError ? err.message : 'Failed to mark as sold.');
-        }
-    };
+  const confirmDelete = (listing: MyListing) => {
+    setListingToDelete(listing);
+    setIsDeleteDialogOpen(true);
+  };
 
-    const askDelete = (listing: MyListing) => {
-        setListingToDelete(listing);
-        setIsDeleteDialogOpen(true);
-    };
+  const handleDelete = async () => {
+    if (!listingToDelete) return;
+    setIsDeleting(true);
+    try {
+      await listingsApi.deleteListing(listingToDelete.id);
+      setIsDeleteDialogOpen(false);
+      setListingToDelete(null);
+      loadListings();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to delete listing.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-    const confirmDelete = async () => {
-        if (!listingToDelete) return;
-        setIsDeleting(true);
-        try {
-            await listingsApi.deleteListing(listingToDelete.id);
-            setIsDeleteDialogOpen(false);
-            setListingToDelete(null);
-            setIsDrawerOpen(false);
-            loadListings();
-        } catch {
-            setError('Failed to delete listing.');
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    const columns: ColumnConfig<MyListing>[] = useMemo(() => [
-        {
-            header: 'Title',
-            render: (listing) => (
-                <div className="flex items-center gap-4">
-                    <img
-                        src={listing.cover_image || '/assets/images/gw-homes-og.png'}
-                        alt=""
-                        className="w-14 h-10 object-cover rounded-lg bg-slate-100 border border-slate-200 flex-shrink-0"
-                    />
-                    <div className="flex flex-col min-w-0">
-                        <span className="text-base font-medium tracking-tight text-slate-700 truncate max-w-[180px]">
-                            {listing.title}
-                        </span>
-                        <span className="text-xs text-slate-400 font-normal">{listing.slug}</span>
-                    </div>
-                </div>
-            ),
-        },
-        { header: 'Location', render: (l) => `${l.sector}, ${l.district}`, cellClassName: 'text-slate-700 text-base font-medium tracking-tight antialiased' },
-        { 
-            header: 'Price', 
-            render: (l) => l.price_rwf ? formatCurrency(l.price_rwf) : 'Price on request', 
-            cellClassName: 'text-slate-700 text-base font-medium tracking-tight antialiased' 
-        },
-        { header: 'Size', render: formatSize, cellClassName: 'text-slate-700 text-base font-medium tracking-tight antialiased' },
-        { header: 'Views', accessorKey: 'view_count', cellClassName: 'text-slate-700 text-base font-medium tracking-tight antialiased' },
-        {
-            header: 'Status',
-            render: (listing) => (
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-tight antialiased border ${STATUS_STYLE[listing.status]}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[listing.status]}`} />
-                    {STATUS_LABEL[listing.status]}{listing.is_featured ? ' ★' : ''}
-                </span>
-            ),
-        },
-        {
-            header: 'Action',
-            headerClassName: 'text-right',
-            cellClassName: 'text-right',
-            render: (listing) => (
-                <ActionDropdown
-                    canReview={true}
-                    canMarkSold={listing.status === 'approved'}
-                    canDelete={listing.status !== 'sold'}
-                    onReview={() => openEdit(listing)}
-                    onMarkSold={() => handleMarkSold(listing)}
-                    onDelete={() => askDelete(listing)}
-                />
-            ),
-        },
-    ], [navigate, formatCurrency]);
-
-    const kpiCards: { filter: KpiFilter; title: string; icon: React.ReactNode; countKey: keyof typeof kpiCounts }[] = [
-        { filter: 'all', title: 'All Properties', icon: <Home size={20} />, countKey: 'all' },
-        { filter: 'pending', title: 'Pending Review', icon: <Clock size={20} />, countKey: 'pending' },
-        { filter: 'approved', title: 'Live', icon: <CheckCircle2 size={20} />, countKey: 'approved' },
-        { filter: 'sold', title: 'Sold', icon: <Tag size={20} />, countKey: 'sold' },
-    ];
-
-    return (
-        <div className="w-full min-w-0 space-y-8 font-sans antialiased">
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {kpiCards.map((kpi) => (
-                    <StatCard
-                        key={kpi.filter}
-                        title={kpi.title}
-                        value={String(kpiCounts[kpi.countKey])}
-                        icon={kpi.icon}
-                        showSubtext={false}
-                        isActive={activeKpiFilter === kpi.filter}
-                        onClick={() => setActiveKpiFilter(kpi.filter)}
-                    />
-                ))}
-            </div>
-
-            <div>
-                <div className="px-1 mb-4">
-                    <h3 className="text-sm font-semibold text-slate-700 tracking-tight">My Properties</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">View and manage all your listed properties.</p>
-                </div>
-                {error && (
-                    <div className="mb-4 flex items-center justify-between gap-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
-                        <span>⚠️ {error}</span>
-                        <button
-                            onClick={loadListings}
-                            className="text-xs font-bold underline text-red-600 hover:text-red-800 whitespace-nowrap"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                )}
-                <div className="flex flex-col">
-                    <div className="flex justify-end px-1 mb-4">
-                        <DashboardButton
-                            variant="primary"
-                            fullWidth={false}
-                            onClick={() => navigate('/dashboard/properties/new')}
-                        >
-                            Add Property
-                        </DashboardButton>
-                    </div>
-                    <TableBlueprint
-                        data={filteredListings}
-                        columns={columns}
-                        isLoading={loading}
-                        emptyMessage={loading ? 'Loading…' : 'No properties matched your criteria.'}
-                        searchPlaceholder="Search properties..."
-                        searchKeys={['title', 'district', 'sector']}
-                        filterConfig={[
-                            {
-                                accessorKey: 'status',
-                                label: 'Status',
-                                options: [
-                                    { label: 'Pending', value: 'pending' },
-                                    { label: 'Live', value: 'approved' },
-                                    { label: 'Sold', value: 'sold' },
-                                    { label: 'Rejected', value: 'rejected' },
-                                ],
-                            },
-                        ]}
-                        totalItems={filteredListings.length}
-                        hasPrevPage={false}
-                        hasNextPage={false}
-                    />
-                </div>
-            </div>
-
-            <AlertDialog
-                isOpen={isDeleteDialogOpen}
-                onClose={() => {
-                    setIsDeleteDialogOpen(false);
-                    setListingToDelete(null);
-                }}
-                onConfirm={confirmDelete}
-                title="Delete Property"
-                description={`Are you sure you want to delete "${listingToDelete?.title}"? This action cannot be undone.`}
-                confirmLabel="Delete"
-                cancelLabel="Cancel"
-                variant="danger"
-                isLoading={isDeleting}
+  const tableColumns: ColumnConfig<MyListing>[] = [
+    {
+      header: 'Property Details',
+      accessorKey: 'title',
+      tooltip: 'Your parcel title, location, and official UPI code. Click title or edit button to update.',
+      render: (l) => (
+        <div className="flex items-center gap-3">
+          <img
+            src={l.cover_image || '/assets/images/gw-homes-og.png'}
+            alt=""
+            className="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0"
+          />
+          <div className="flex flex-col min-w-0">
+            <TruncatedCellTooltip
+              text={l.title}
+              fullText={l.title}
+              subtext={`${l.sector}, ${l.district} • ${formatSize(l)}`}
+              maxWidthClass="max-w-[200px] sm:max-w-xs"
             />
-
-            {selectedListing && (
-                <DrawerBlueprint
-                    isOpen={isDrawerOpen}
-                    onClose={() => setIsDrawerOpen(false)}
-                    title={editMode ? 'Edit Property' : 'Property Details'}
-                    footer={
-                        editMode ? (
-                            <>
-                                <DashboardButton variant="outline" onClick={() => setIsDrawerOpen(false)}>Cancel</DashboardButton>
-                                <DashboardButton variant="primary" onClick={handleSaveEdit} disabled={isSaving}>
-                                    {isSaving ? 'Saving…' : 'Save Changes'}
-                                </DashboardButton>
-                            </>
-                        ) : (
-                            <>
-                                {selectedListing.status === 'approved' && (
-                                    <DashboardButton variant="outline" onClick={() => handleMarkSold(selectedListing)}>
-                                        Mark Sold
-                                    </DashboardButton>
-                                )}
-                                <DashboardButton variant="danger-outline" onClick={() => askDelete(selectedListing)}>
-                                    Delete
-                                </DashboardButton>
-                            </>
-                        )
-                    }
-                >
-                    {actionError && <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
-                    {editMode ? (
-                        <div className="space-y-4">
-                            <Field label="Title" required>
-                                <Input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} />
-                            </Field>
-                            <Field label="Description" required>
-                                <TextArea rows={4} value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} />
-                            </Field>
-                            <div className="grid grid-cols-2 gap-4">
-                                <Field label="Price RWF">
-                                    <Input type="number" value={editForm.price_rwf} onChange={(e) => setEditForm((f) => ({ ...f, price_rwf: e.target.value }))} />
-                                </Field>
-                                <Field label="Price USD">
-                                    <Input type="number" value={editForm.price_usd} onChange={(e) => setEditForm((f) => ({ ...f, price_usd: e.target.value }))} />
-                                </Field>
-                            </div>
-                            <Field label={`Size (${selectedListing.size_unit})`}>
-                                <Input type="number" value={editForm.size_value} onChange={(e) => setEditForm((f) => ({ ...f, size_value: e.target.value }))} />
-                            </Field>
-                            {selectedListing.status === 'approved' && (
-                                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                                    Editing a live listing sends it back to admin for re-approval.
-                                </p>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="space-y-6">
-                            <div>
-                                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Title</label>
-                                <div className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base font-medium text-slate-700 flex items-center gap-2.5">
-                                    <Home size={18} className="text-slate-400 flex-shrink-0" />
-                                    <span className="truncate">{selectedListing.title}</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Price</label>
-                                <div className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600 flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-slate-300" />
-                                    <span>{selectedListing.price_rwf ? formatCurrency(selectedListing.price_rwf) : 'Price on request'}</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Size</label>
-                                <div className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base font-medium text-slate-700 flex items-center gap-2.5">
-                                    <Maximize2 size={18} className="text-slate-400 flex-shrink-0" />
-                                    <span>{formatSize(selectedListing)}</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Location</label>
-                                <div className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base font-medium text-slate-700 flex items-center gap-2.5">
-                                    <MapPin size={18} className="text-slate-400 flex-shrink-0" />
-                                    <span>{selectedListing.sector}, {selectedListing.district}</span>
-                                </div>
-                            </div>
-                            {selectedListing.status === 'rejected' && selectedListing.rejection_reason && (
-                                <div>
-                                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Rejection reason</label>
-                                    <div className="w-full px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                                        {selectedListing.rejection_reason}
-                                    </div>
-                                </div>
-                            )}
-                            <DashboardButton variant="outline" onClick={() => openEdit(selectedListing)}>
-                                Edit Listing
-                            </DashboardButton>
-                        </div>
-                    )}
-                </DrawerBlueprint>
-            )}
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+              <MapPin size={11} className="text-[#54B5BB]" />
+              <span className="truncate">{l.sector}, {l.district}</span>
+              {l.upi && (
+                <TruncatedCellTooltip
+                  text={l.upi}
+                  fullText={l.upi}
+                  subtext="National Land Authority Unique Parcel Identifier (UPI)"
+                  allowCopy={true}
+                  badge="UPI"
+                  maxWidthClass="max-w-[120px]"
+                />
+              )}
+            </div>
+          </div>
         </div>
-    );
+      ),
+    },
+    {
+      header: 'Price & Size',
+      accessorKey: 'price_rwf',
+      tooltip: 'Asking price converted to your active viewing currency, alongside surveyed land size.',
+      render: (l) => (
+        <div className="flex flex-col">
+          <span className="font-bold text-slate-800 text-xs">{formatCurrency(l.price_rwf, l.price_usd)}</span>
+          <span className="text-[11px] text-slate-400">{formatSize(l)}</span>
+        </div>
+      ),
+    },
+    {
+      header: 'Engagement',
+      accessorKey: 'view_count',
+      tooltip: 'Total distinct buyer views and impressions recorded since publication.',
+      render: (l) => (
+        <Tooltip content={`${l.view_count || 0} prospective buyers visited this property`} position="top" variant="brand">
+          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100 cursor-default">
+            <Eye size={13} className="text-[#54B5BB]" />
+            <span>{l.view_count || 0} views</span>
+          </div>
+        </Tooltip>
+      ),
+    },
+    {
+      header: 'Status',
+      accessorKey: 'status',
+      tooltip: 'Current approval stage on the marketplace. Hover badge to learn next steps.',
+      render: (l) => (
+        <PropertyStatusBadgeTooltip
+          status={l.status}
+          isFeatured={l.is_featured}
+        />
+      ),
+    },
+    {
+      header: 'Actions',
+      accessorKey: 'id',
+      tooltip: 'Modify property details, adjust price, or withdraw listing.',
+      render: (l) => (
+        <div className="flex items-center justify-end gap-1.5">
+          <Tooltip content="Edit pricing and property details" position="top" variant="dark">
+            <button
+              onClick={() => openEdit(l)}
+              className="p-1.5 rounded-lg bg-slate-100 hover:bg-[#1B395F] hover:text-white text-slate-700 transition-colors cursor-pointer"
+            >
+              <Edit2 size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip content="Delete this listing" position="top" variant="danger">
+            <button
+              onClick={() => confirmDelete(l)}
+              className="p-1.5 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+            >
+              <Trash2 size={15} />
+            </button>
+          </Tooltip>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6 w-full min-w-0">
+      {/* Top Header & Actions Toolbar (Image 2 style) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            My Land Portfolio
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Manage your property listings, update pricing, track client views, and promote parcels.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <DashboardButton
+            variant="outline"
+            size="sm"
+            onClick={loadListings}
+            icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
+          >
+            Refresh
+          </DashboardButton>
+
+          <DashboardButton
+            variant="teal"
+            size="md"
+            pill
+            onClick={() => navigate('/dashboard/properties/new')}
+            icon={<Plus size={16} />}
+          >
+            + Add New Property
+          </DashboardButton>
+        </div>
+      </div>
+
+      {/* KPI Stat Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+        <StatCard
+          title="All Listings"
+          value={String(kpiCounts.all)}
+          icon={<Building2 size={18} />}
+          accentGradient="teal"
+          isActive={activeKpiFilter === 'all'}
+          onClick={() => setActiveKpiFilter('all')}
+          comparisonLabel="in your account"
+        />
+        <StatCard
+          title="Published & Live"
+          value={String(kpiCounts.approved)}
+          icon={<CheckCircle2 size={18} />}
+          accentGradient="emerald"
+          isActive={activeKpiFilter === 'approved'}
+          onClick={() => setActiveKpiFilter('approved')}
+          comparisonLabel="visible to buyers"
+        />
+        <StatCard
+          title="Under Review"
+          value={String(kpiCounts.pending)}
+          icon={<Clock size={18} />}
+          accentGradient="amber"
+          isActive={activeKpiFilter === 'pending'}
+          onClick={() => setActiveKpiFilter('pending')}
+          comparisonLabel="admin verification"
+        />
+        <StatCard
+          title="Completed / Sold"
+          value={String(kpiCounts.sold)}
+          icon={<Tag size={18} />}
+          accentGradient="cyan"
+          isActive={activeKpiFilter === 'sold'}
+          onClick={() => setActiveKpiFilter('sold')}
+          comparisonLabel="transacted"
+        />
+      </div>
+
+      {/* Search & View Toolbar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.04)] flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="relative w-full md:w-80">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search your listings by title, UPI, sector..."
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#54B5BB] transition-all"
+          />
+        </div>
+
+        <div className="flex items-center justify-between md:justify-end w-full md:w-auto gap-3">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+            {(['all', 'approved', 'pending', 'sold'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveKpiFilter(tab)}
+                className={`px-3 py-1.5 rounded-lg capitalize transition-all cursor-pointer ${
+                  activeKpiFilter === tab
+                    ? 'bg-[#1B395F] text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {tab === 'approved' ? 'Live' : tab}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1 border border-slate-200 rounded-xl p-1 bg-slate-50">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === 'grid' ? 'bg-[#1B395F] text-white shadow-xs' : 'text-slate-400 hover:text-slate-700'
+              }`}
+              title="Grid View"
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === 'table' ? 'bg-[#1B395F] text-white shadow-xs' : 'text-slate-400 hover:text-slate-700'
+              }`}
+              title="Table View"
+            >
+              <List size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Listings Display Grid or Table */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-80 bg-slate-100 rounded-2xl" />
+          ))}
+        </div>
+      ) : filteredListings.length === 0 ? (
+        <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-200 text-center space-y-4">
+          <Building2 size={40} className="mx-auto text-slate-300" />
+          <h3 className="text-base font-extrabold text-slate-700">No properties in this view</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            {searchQuery ? `No properties matching "${searchQuery}"` : 'Create your first land parcel listing to start receiving buyer leads.'}
+          </p>
+          <DashboardButton
+            variant="teal"
+            size="md"
+            pill
+            onClick={() => navigate('/dashboard/properties/new')}
+            icon={<Plus size={16} />}
+          >
+            + Create New Listing
+          </DashboardButton>
+        </div>
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full min-w-0">
+          {filteredListings.map((property) => (
+            <PropertyCard
+              key={property.id}
+              property={property}
+              isAdminView={false}
+              onView={() => openEdit(property)}
+              onEdit={() => openEdit(property)}
+              onDelete={() => confirmDelete(property)}
+            />
+          ))}
+        </div>
+      ) : (
+        <TableBlueprint
+          columns={tableColumns}
+          data={filteredListings}
+          totalItems={filteredListings.length}
+        />
+      )}
+
+      {/* Edit Property Drawer */}
+      <DrawerBlueprint
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        title="Edit Listing Details"
+        subtitle={selectedListing?.title}
+        footer={
+          <div className="flex gap-3 w-full">
+            <DashboardButton variant="outline" fullWidth onClick={() => setIsDrawerOpen(false)}>
+              Cancel
+            </DashboardButton>
+            <DashboardButton
+              variant="teal"
+              fullWidth
+              onClick={handleSaveEdit}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving Changes...' : 'Save Changes'}
+            </DashboardButton>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="Property Title" required>
+            <Input
+              value={editForm.title}
+              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+              placeholder="e.g. Prime Commercial Land in Kinyinya"
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Price in RWF">
+              <Input
+                type="number"
+                value={editForm.price_rwf}
+                onChange={(e) => setEditForm({ ...editForm, price_rwf: e.target.value })}
+                placeholder="e.g. 45000000"
+              />
+            </Field>
+
+            <Field label="Price in USD">
+              <Input
+                type="number"
+                value={editForm.price_usd}
+                onChange={(e) => setEditForm({ ...editForm, price_usd: e.target.value })}
+                placeholder="e.g. 35000"
+              />
+            </Field>
+          </div>
+
+          <Field label="Parcel Size (sqm / ha)">
+            <Input
+              type="number"
+              value={editForm.size_value}
+              onChange={(e) => setEditForm({ ...editForm, size_value: e.target.value })}
+              placeholder="e.g. 600"
+            />
+          </Field>
+
+          <Field label="Description">
+            <TextArea
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              rows={4}
+              placeholder="Provide key details about road access, zoning, topography..."
+            />
+          </Field>
+
+          {actionError && <p className="text-xs text-rose-600 font-semibold">{actionError}</p>}
+        </div>
+      </DrawerBlueprint>
+
+      {/* Delete Confirmation Alert Dialog */}
+      <AlertDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        title="Delete Property Listing?"
+        description={`Are you sure you want to delete "${listingToDelete?.title}"? All associated inquiries and view metrics will be removed.`}
+        confirmLabel={isDeleting ? 'Deleting...' : 'Delete Listing'}
+        variant="danger"
+        onConfirm={handleDelete}
+      />
+    </div>
+  );
 };

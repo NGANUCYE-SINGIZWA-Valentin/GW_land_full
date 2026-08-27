@@ -4,10 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { TableBlueprint, ColumnConfig } from '@/components/dashboard/TableBlueprint';
 import { DrawerBlueprint } from '@/components/dashboard/DrawerBlueprint';
+import { StatGridSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { ActionDropdown } from '@/components/dashboard/ActionDropdown';
 import { AlertDialog } from '@/components/ui/AlertDialog';
 import { DashboardButton } from '@/components/ui/DashboardButton';
 import { Avatar } from '@/components/ui/Avatar';
+import { Tooltip, TruncatedCellTooltip } from '@/components/ui/Tooltip';
 import {
     Users,
     UserCheck,
@@ -105,7 +107,7 @@ export const UserManagement: React.FC = () => {
     const loadUsers = () => {
         setLoading(true);
         adminApi.getAllUsers()
-            .then((res) => setUsers(res.users))
+            .then((res) => setUsers(res?.users || []))
             .catch(() => setError('Failed to load users.'))
             .finally(() => setLoading(false));
     };
@@ -247,37 +249,96 @@ export const UserManagement: React.FC = () => {
     const columns: ColumnConfig<BackendUser>[] = [
         {
             header: 'Name',
+            accessorKey: 'full_name',
+            tooltip: 'User profile details, verified credentials, and registered email address.',
             render: (u) => (
                 <div className="flex items-center gap-3">
                     <Avatar src={u.photo_url} name={u.full_name} size="md" />
                     <div className="flex flex-col min-w-0">
-                        <span className="text-base font-medium tracking-tight text-slate-700 truncate max-w-[160px] flex items-center gap-1">
-                            {u.full_name}
-                            {u.is_verified && <ShieldCheck size={13} className="text-emerald-500 flex-shrink-0" />}
-                        </span>
-                        <span className="text-xs text-slate-400 font-normal truncate">{u.email}</span>
+                        <div className="flex items-center gap-1.5">
+                            <TruncatedCellTooltip
+                                text={u.full_name}
+                                fullText={u.full_name}
+                                subtext={`Role: ${ROLE_LABEL[u.role]} • Status: ${u.status}`}
+                                maxWidthClass="max-w-[150px]"
+                            />
+                            {u.is_verified && (
+                                <Tooltip content="Verified identity and phone" position="top" variant="brand">
+                                    <span className="inline-flex cursor-default">
+                                        <ShieldCheck size={14} className="text-emerald-500 flex-shrink-0" />
+                                    </span>
+                                </Tooltip>
+                            )}
+                        </div>
+                        <TruncatedCellTooltip
+                            text={u.email}
+                            fullText={u.email}
+                            allowCopy={true}
+                            badge="Email"
+                            maxWidthClass="max-w-[170px]"
+                        />
                     </div>
                 </div>
             ),
         },
         {
             header: 'Role',
-            render: (u) => <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${ROLE_STYLE[u.role]}`}>{ROLE_LABEL[u.role]}</span>,
+            accessorKey: 'role',
+            tooltip: 'Assigned platform access permissions and capabilities.',
+            render: (u) => (
+                <Tooltip
+                    content={
+                        u.role === 'admin' ? 'Full system administrator rights' :
+                        u.role === 'sub_admin' ? 'Moderator permissions for listings and disputes' :
+                        u.role === 'seller' ? 'Landowner or verified real estate agent' : 'Prospective buyer / inquiry sender'
+                    }
+                    position="top"
+                    variant="dark"
+                >
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-default ${ROLE_STYLE[u.role]}`}>
+                        {ROLE_LABEL[u.role]}
+                    </span>
+                </Tooltip>
+            ),
         },
         {
             header: 'Status',
+            accessorKey: 'status',
+            tooltip: 'Account authentication and access standing.',
             render: (u) => (
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-tight antialiased border ${STATUS_STYLE[u.status]}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[u.status]}`} />
-                    {u.status}
-                </span>
+                <Tooltip
+                    content={
+                        u.status === 'approved' ? 'Active account with full platform access' :
+                        u.status === 'pending' ? 'Pending initial email/KYC verification' : 'Access suspended by administrator'
+                    }
+                    position="top"
+                    variant={u.status === 'blocked' ? 'danger' : 'dark'}
+                >
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-tight antialiased border cursor-default ${STATUS_STYLE[u.status] || 'bg-slate-100 border-slate-200 text-slate-600'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[u.status] || 'bg-slate-400'}`} />
+                        {u.status}
+                    </span>
+                </Tooltip>
             ),
         },
-        { header: 'Joined', render: (u) => new Date(u.created_at).toLocaleDateString(), cellClassName: 'text-slate-700 text-base font-medium tracking-tight antialiased' },
+        {
+            header: 'Joined',
+            accessorKey: 'created_at',
+            tooltip: 'Registration timestamp.',
+            render: (u) => (
+                <Tooltip content={`Registered on ${new Date(u.created_at).toLocaleString()}`} position="top" variant="dark">
+                    <span className="text-slate-700 text-sm font-medium tracking-tight antialiased cursor-default">
+                        {new Date(u.created_at).toLocaleDateString()}
+                    </span>
+                </Tooltip>
+            ),
+        },
         {
             header: 'Action',
+            accessorKey: 'id',
             headerClassName: 'text-right',
             cellClassName: 'text-right',
+            tooltip: 'Account administrative actions: review dossier, change role, or impersonate session.',
             render: (u) => {
                 const isSelf = u.id === currentUser?.id;
                 return (
@@ -313,19 +374,23 @@ export const UserManagement: React.FC = () => {
     return (
         <div className="w-full min-w-0 space-y-8 font-sans antialiased">
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-                {kpiCards.map((kpi) => (
-                    <StatCard
-                        key={kpi.filter}
-                        title={kpi.title}
-                        value={String(kpiCounts[kpi.countKey])}
-                        icon={kpi.icon}
-                        showSubtext={false}
-                        isActive={activeKpiFilter === kpi.filter}
-                        onClick={() => setActiveKpiFilter(kpi.filter)}
-                    />
-                ))}
-            </div>
+            {loading ? (
+                <StatGridSkeleton count={kpiCards.length} cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-5" />
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                    {kpiCards.map((kpi) => (
+                        <StatCard
+                            key={kpi.filter}
+                            title={kpi.title}
+                            value={String(kpiCounts[kpi.countKey])}
+                            icon={kpi.icon}
+                            showSubtext={false}
+                            isActive={activeKpiFilter === kpi.filter}
+                            onClick={() => setActiveKpiFilter(kpi.filter)}
+                        />
+                    ))}
+                </div>
+            )}
 
             <div>
                 <div className="px-1 mb-4 flex items-center justify-between gap-3">
@@ -457,7 +522,7 @@ export const UserManagement: React.FC = () => {
                                     selectedUser.status === 'approved' ? 'text-emerald-600' :
                                     selectedUser.status === 'pending' ? 'text-amber-600' : 'text-red-600'
                                 }`}>
-                                    <span className={`w-2 h-2 rounded-full ${STATUS_DOT[selectedUser.status]}`} />
+                                    <span className={`w-2 h-2 rounded-full ${STATUS_DOT[selectedUser.status] || 'bg-slate-400'}`} />
                                     {selectedUser.status}
                                 </span>
                             </div>

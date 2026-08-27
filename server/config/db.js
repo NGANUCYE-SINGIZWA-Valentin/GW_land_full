@@ -77,6 +77,19 @@ const mockSectors = [
 
 const mockUsers = [
   {
+    id: '00000000-0000-0000-0000-000000000000',
+    full_name: 'Singizwa V (Super Admin)',
+    email: 'singizwav250@gmail.com',
+    password_hash: defaultPasswordHash,
+    role: 'admin',
+    status: 'approved',
+    is_verified: true,
+    phone: '+250788000000',
+    whatsapp_number: '+250788000000',
+    photo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    created_at: new Date('2024-01-01T00:00:00Z').toISOString(),
+  },
+  {
     id: '11111111-1111-1111-1111-111111111111',
     full_name: 'System Admin',
     email: 'admin@gwland.com',
@@ -103,6 +116,32 @@ const mockUsers = [
     created_at: new Date('2024-01-05T00:00:00Z').toISOString(),
   },
   {
+    id: '22222222-2222-2222-2222-333333333333',
+    full_name: 'SubAdmin Moderator',
+    email: 'subadmin@gwland.rw',
+    password_hash: defaultPasswordHash,
+    role: 'sub_admin',
+    status: 'approved',
+    is_verified: true,
+    phone: '+250788000002',
+    whatsapp_number: '+250788000002',
+    photo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    created_at: new Date('2024-01-05T00:00:00Z').toISOString(),
+  },
+  {
+    id: '22222222-2222-2222-2222-444444444444',
+    full_name: 'SubAdmin QA',
+    email: 'subadmin@test.com',
+    password_hash: defaultPasswordHash,
+    role: 'sub_admin',
+    status: 'approved',
+    is_verified: true,
+    phone: '+250788000002',
+    whatsapp_number: '+250788000002',
+    photo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    created_at: new Date('2024-01-05T00:00:00Z').toISOString(),
+  },
+  {
     id: '33333333-3333-3333-3333-333333333333',
     full_name: 'Kigali Prime Real Estate',
     email: 'seller@test.com',
@@ -116,9 +155,35 @@ const mockUsers = [
     created_at: new Date('2024-01-10T00:00:00Z').toISOString(),
   },
   {
+    id: '33333333-3333-3333-3333-555555555555',
+    full_name: 'Cedric Mugisha (Agent)',
+    email: 'seller@gwland.com',
+    password_hash: defaultPasswordHash,
+    role: 'seller',
+    status: 'approved',
+    is_verified: true,
+    phone: '+250788123456',
+    whatsapp_number: '+250788123456',
+    photo_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
+    created_at: new Date('2024-01-10T00:00:00Z').toISOString(),
+  },
+  {
     id: '44444444-4444-4444-4444-444444444444',
     full_name: 'David Buyer',
     email: 'buyer@test.com',
+    password_hash: buyerPasswordHash,
+    role: 'buyer',
+    status: 'approved',
+    is_verified: true,
+    phone: '+250789999000',
+    whatsapp_number: '+250789999000',
+    photo_url: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=200&q=80',
+    created_at: new Date('2024-01-15T00:00:00Z').toISOString(),
+  },
+  {
+    id: '44444444-4444-4444-4444-666666666666',
+    full_name: 'Diane Umutoni',
+    email: 'buyer@gwland.com',
     password_hash: buyerPasswordHash,
     role: 'buyer',
     status: 'approved',
@@ -363,7 +428,11 @@ async function executeMockQuery(sqlText, params = []) {
 
   // 5. Auth & Users
   if (lower.includes('select') && lower.includes('from users') && lower.includes('email = $1')) {
-    const user = mockUsers.find((u) => u.email.toLowerCase() === String(params[0]).toLowerCase());
+    const rawTarget = String(params[0] || '').trim().toLowerCase();
+    const user = mockUsers.find((u) => {
+      const email = u.email.toLowerCase();
+      return email === rawTarget || email.startsWith(`${rawTarget}@`) || rawTarget.startsWith(`${email.split('@')[0]}@`);
+    });
     return { rows: user ? [{ ...user }] : [] };
   }
 
@@ -517,7 +586,134 @@ async function executeMockQuery(sqlText, params = []) {
     return { rows: [newMsg] };
   }
 
-  // 9. Admin Stats / Activity Log
+  // 9. Admin Stats / Activity Log / Analytics / Payments
+  if (lower.includes('generate_series')) {
+    const days = [];
+    const now = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const isoDay = d.toISOString().split('T')[0];
+      const count = i % 4 === 0 ? Math.floor(Math.random() * 3) + 1 : Math.floor(Math.random() * 2);
+      days.push({ day: isoDay, count });
+    }
+    return { rows: days };
+  }
+
+  if (lower.includes('from listings') && lower.includes('filter (where status')) {
+    const total = mockListings.length;
+    const active = mockListings.filter((l) => l.status === 'approved').length;
+    const pending = mockListings.filter((l) => l.status === 'pending').length;
+    const sold = mockListings.filter((l) => l.status === 'sold').length;
+    return { rows: [{ total, active, pending, sold }] };
+  }
+
+  if (lower.includes('from users u') && lower.includes('join listings l') && lower.includes('group by u.id')) {
+    const sellers = mockUsers
+      .filter((u) => u.role === 'seller')
+      .map((u) => {
+        const userListings = mockListings.filter((l) => l.seller_id === u.id);
+        const approvedListings = userListings.filter((l) => l.status === 'approved');
+        const totalViews = userListings.reduce((sum, l) => sum + (l.view_count || 0), 0);
+        return {
+          id: u.id,
+          full_name: u.full_name,
+          email: u.email,
+          photo_url: u.photo_url || null,
+          is_verified: u.is_verified || true,
+          listing_count: String(approvedListings.length || userListings.length || 3),
+          total_views: String(totalViews || 142),
+        };
+      });
+    return { rows: sellers };
+  }
+
+  if (lower.includes('from notifications')) {
+    return {
+      rows: [
+        {
+          id: 'notif-1',
+          user_id: params[0] || 'admin-id',
+          type: 'listing_submitted',
+          title: 'New Listing Submitted',
+          body: 'A new parcel in Gasabo, Kinyinya requires title verification.',
+          is_read: false,
+          created_at: new Date(Date.now() - 3600000).toISOString(),
+        },
+        {
+          id: 'notif-2',
+          user_id: params[0] || 'admin-id',
+          type: 'user_registered',
+          title: 'New Seller Verification Request',
+          body: 'Cedric Mugisha uploaded a national ID for broker certification.',
+          is_read: false,
+          created_at: new Date(Date.now() - 7200000).toISOString(),
+        },
+      ],
+    };
+  }
+
+  if (lower.includes('from payments') || lower.includes('from subscriptions')) {
+    return {
+      rows: [
+        {
+          id: 'pay-1',
+          user_id: mockUsers[0]?.id || 'u1',
+          user_name: 'Cedric Mugisha',
+          user_email: 'seller@gwland.rw',
+          amount: '35000',
+          amount_rwf: 35000,
+          currency: 'RWF',
+          plan_key: 'featured_placement',
+          payment_type: 'featured_placement',
+          provider: 'momo',
+          payment_method: 'Mobile Money',
+          reference_note: 'MOMO-893201',
+          transaction_ref: 'MOMO-893201',
+          status: 'completed',
+          created_at: new Date(Date.now() - 86400000).toISOString(),
+          updated_at: new Date(Date.now() - 86400000).toISOString(),
+        },
+        {
+          id: 'pay-2',
+          user_id: mockUsers[1]?.id || 'u2',
+          user_name: 'Grace Uwase',
+          user_email: 'grace@gwland.rw',
+          amount: '15000',
+          amount_rwf: 15000,
+          currency: 'RWF',
+          plan_key: 'subscription_monthly',
+          payment_type: 'subscription',
+          provider: 'momo',
+          payment_method: 'Mobile Money',
+          reference_note: 'MOMO-482019',
+          transaction_ref: 'MOMO-482019',
+          status: 'completed',
+          created_at: new Date(Date.now() - 172800000).toISOString(),
+          updated_at: new Date(Date.now() - 172800000).toISOString(),
+        },
+      ],
+    };
+  }
+
+  if (lower.includes('from reports')) {
+    return {
+      rows: [
+        {
+          id: 'rep-1',
+          listing_id: mockListings[0]?.id || 'l1',
+          listing_title: mockListings[0]?.title || 'Prime Residential Land in Kinyinya',
+          reporter_id: mockUsers[0]?.id || 'u1',
+          reporter_name: 'Buyer User',
+          reporter_email: 'buyer@gwland.rw',
+          reason: 'Inaccurate boundary coordinates indicated in description',
+          status: 'pending',
+          created_at: new Date(Date.now() - 86400000).toISOString(),
+        },
+      ],
+    };
+  }
+
   if (lower.includes('from activity_log')) {
     return { rows: [...mockActivityLogs] };
   }

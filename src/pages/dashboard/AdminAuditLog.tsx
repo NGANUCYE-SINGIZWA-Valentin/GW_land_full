@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TableBlueprint, ColumnConfig } from '@/components/dashboard/TableBlueprint';
+import { Tooltip, TruncatedCellTooltip } from '@/components/ui/Tooltip';
 import { exportToCSV, printSummaryReport } from '@/utils/ExportUtility';
 import { ShieldCheck, Download, Printer, Filter, UserCheck, Key, ShieldAlert } from 'lucide-react';
 
@@ -59,19 +60,29 @@ export const AdminAuditLog: React.FC = () => {
     {
       header: 'Timestamp',
       accessorKey: 'timestamp',
+      tooltip: 'Exact UTC date and time when the security event occurred.',
       cellClassName: 'text-xs font-semibold text-slate-500 font-mono',
     },
     {
       header: 'Admin User',
+      accessorKey: 'adminName',
+      tooltip: 'Identity of the operator who performed the action.',
       render: (log) => (
         <div className="flex flex-col">
-          <span className="text-xs font-bold text-slate-800 dark:text-white">{log.adminName}</span>
+          <TruncatedCellTooltip
+            text={log.adminName}
+            fullText={log.adminName}
+            subtext={log.adminEmail}
+            maxWidthClass="max-w-[140px]"
+          />
           <span className="text-[10px] text-slate-400">{log.adminEmail}</span>
         </div>
       ),
     },
     {
       header: 'Action Type',
+      accessorKey: 'action',
+      tooltip: 'Categorized security event classification.',
       render: (log) => {
         const badgeColors: Record<AuditEntry['action'], string> = {
           PROPERTY_APPROVAL: 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -80,22 +91,49 @@ export const AdminAuditLog: React.FC = () => {
           ACCOUNT_IMPERSONATION: 'bg-purple-50 text-purple-600 border-purple-200',
           CONTENT_DELETION: 'bg-rose-50 text-rose-600 border-rose-200',
         };
+        const actionDesc: Record<AuditEntry['action'], string> = {
+          PROPERTY_APPROVAL: 'Moderator approved and published a land listing',
+          USER_ROLE_CHANGE: 'Modified user permissions or verification status',
+          PRICING_UPDATE: 'Updated listing price parameters or tier rates',
+          ACCOUNT_IMPERSONATION: 'Administrative session takeover for support',
+          CONTENT_DELETION: 'Removed flagged or duplicate content from database',
+        };
         return (
-          <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${badgeColors[log.action]}`}>
-            {log.action}
-          </span>
+          <Tooltip content={actionDesc[log.action]} position="top" variant="dark">
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border cursor-default ${badgeColors[log.action]}`}>
+              {log.action}
+            </span>
+          </Tooltip>
         );
       },
     },
     {
       header: 'Event Details',
       accessorKey: 'details',
-      cellClassName: 'text-xs text-slate-700 dark:text-slate-300 font-medium',
+      tooltip: 'Detailed payload, modified entity ID, or specific justification.',
+      render: (log) => (
+        <TruncatedCellTooltip
+          text={log.details}
+          fullText={log.details}
+          subtext={`Action: ${log.action}`}
+          allowCopy={true}
+          maxWidthClass="max-w-xs sm:max-w-md"
+        />
+      ),
     },
     {
       header: 'IP Address',
       accessorKey: 'ipAddress',
-      cellClassName: 'text-xs text-slate-400 font-mono',
+      tooltip: 'Network client IP recorded at the time of invocation.',
+      render: (log) => (
+        <TruncatedCellTooltip
+          text={log.ipAddress}
+          fullText={log.ipAddress}
+          allowCopy={true}
+          badge="IP"
+          maxWidthClass="max-w-[120px]"
+        />
+      ),
     },
   ];
 

@@ -27,31 +27,54 @@ const SYMBOLS: Record<Currency, string> = {
 interface CurrencyContextType {
   currency: Currency;
   setCurrency: (c: Currency) => void;
-  formatPrice: (priceRwf: number) => string;
+  formatPrice: (priceRwf?: number | string | null, priceUsd?: number | string | null) => string;
+  formatCurrency: (priceRwf?: number | string | null, priceUsd?: number | string | null) => string;
 }
+
+const defaultFormatter = (priceRwf?: number | string | null): string => {
+  const num = Number(priceRwf);
+  if (!priceRwf || isNaN(num) || num <= 0) return 'Price on request';
+  return `RWF ${Math.round(num).toLocaleString()}`;
+};
 
 const CurrencyContext = createContext<CurrencyContextType>({
   currency: 'RWF',
   setCurrency: () => {},
-  formatPrice: (priceRwf: number) => `RWF ${priceRwf.toLocaleString()}`,
+  formatPrice: defaultFormatter,
+  formatCurrency: defaultFormatter,
 });
 
 export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currency, setCurrency] = useState<Currency>('RWF');
 
-  const formatPrice = (priceRwf: number): string => {
-    if (!priceRwf || isNaN(priceRwf)) return 'Price on request';
-    const rate = RATES[currency];
-    const converted = priceRwf * rate;
+  const formatPrice = (priceRwf?: number | string | null, priceUsd?: number | string | null): string => {
+    const numRwf = Number(priceRwf);
+    const numUsd = Number(priceUsd);
+
+    if (currency === 'USD' && !isNaN(numUsd) && numUsd > 0) {
+      return `$ ${Math.round(numUsd).toLocaleString()}`;
+    }
+
+    if (!priceRwf || isNaN(numRwf) || numRwf <= 0) {
+      if (!isNaN(numUsd) && numUsd > 0) {
+        return `$ ${Math.round(numUsd).toLocaleString()}`;
+      }
+      return 'Price on request';
+    }
+
+    const rate = RATES[currency] ?? 1;
+    const converted = numRwf * rate;
 
     if (currency === 'RWF') {
       return `RWF ${Math.round(converted).toLocaleString()}`;
     }
-    return `${SYMBOLS[currency]} ${Math.round(converted).toLocaleString()}`;
+    return `${SYMBOLS[currency] ?? '$'} ${Math.round(converted).toLocaleString()}`;
   };
 
+  const formatCurrency = formatPrice;
+
   return (
-    <CurrencyContext.Provider value={{ currency, setCurrency, formatPrice }}>
+    <CurrencyContext.Provider value={{ currency, setCurrency, formatPrice, formatCurrency }}>
       {children}
     </CurrencyContext.Provider>
   );

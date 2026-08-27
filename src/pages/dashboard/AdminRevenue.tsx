@@ -12,10 +12,13 @@ import * as paymentsApi from '@/api/payments';
 import { ApiError } from '@/api/client';
 import type { AdminPayment, RevenueSummary, PricingPlan, PlanKey } from '@/api/types';
 
-const STATUS_BADGE: Record<AdminPayment['status'], { bg: string; icon: React.ReactNode; label: string }> = {
+const STATUS_BADGE: Record<string, { bg: string; icon: React.ReactNode; label: string }> = {
     completed: { bg: 'bg-emerald-50 border-emerald-100 text-emerald-600', icon: <CheckCircle2 size={14} />, label: 'Completed' },
+    confirmed: { bg: 'bg-emerald-50 border-emerald-100 text-emerald-600', icon: <CheckCircle2 size={14} />, label: 'Completed' },
+    approved: { bg: 'bg-emerald-50 border-emerald-100 text-emerald-600', icon: <CheckCircle2 size={14} />, label: 'Completed' },
     pending: { bg: 'bg-amber-50 border-amber-100 text-amber-600', icon: <Clock size={14} />, label: 'Pending' },
     failed: { bg: 'bg-red-50 border-red-100 text-red-600', icon: <XCircle size={14} />, label: 'Failed' },
+    rejected: { bg: 'bg-red-50 border-red-100 text-red-600', icon: <XCircle size={14} />, label: 'Rejected' },
 };
 
 const PLAN_LABEL: Record<string, string> = {
@@ -49,9 +52,14 @@ export const AdminRevenue: React.FC = () => {
             paymentsApi.getPricingPlans(),
         ])
             .then(([paymentsRes, summaryRes, pricingRes]) => {
-                setPayments(paymentsRes.payments);
-                setSummary(summaryRes);
-                setPlans(pricingRes.plans);
+                setPayments(paymentsRes?.payments || []);
+                setSummary(summaryRes || null);
+                setPlans(pricingRes?.plans || []);
+            })
+            .catch(() => {
+                setPayments([]);
+                setSummary(null);
+                setPlans([]);
             })
             .finally(() => setLoading(false));
     };
@@ -109,7 +117,12 @@ export const AdminRevenue: React.FC = () => {
         {
             header: 'Status',
             render: (p) => {
-                const c = STATUS_BADGE[p.status];
+                const statusKey = String(p.status || 'pending').toLowerCase();
+                const c = STATUS_BADGE[statusKey] || {
+                    bg: 'bg-slate-100 border-slate-200 text-slate-600',
+                    icon: <Clock size={14} />,
+                    label: p.status || 'Unknown',
+                };
                 return <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-tight antialiased border ${c.bg}`}>{c.icon} {c.label}</span>;
             },
         },

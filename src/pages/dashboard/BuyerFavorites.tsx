@@ -11,7 +11,8 @@ export const BuyerFavorites: React.FC = () => {
 
   useEffect(() => {
     favoritesApi.getFavorites()
-      .then((res) => setFavorites(res.favorites.map(adaptListingSummary)))
+      .then((res) => setFavorites((res?.favorites || []).map(adaptListingSummary)))
+      .catch(() => setFavorites([]))
       .finally(() => setLoading(false));
   }, []);
 

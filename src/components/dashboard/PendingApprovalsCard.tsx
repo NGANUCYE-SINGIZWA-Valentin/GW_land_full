@@ -12,7 +12,9 @@ interface PendingApprovalsCardProps {
   onItemClick?: (index: number) => void;
 }
 
-export const PendingApprovalsCard: React.FC<PendingApprovalsCardProps> = ({ items, onViewAll, onItemClick }) => {
+export const PendingApprovalsCard: React.FC<PendingApprovalsCardProps> = ({ items = [], onViewAll, onItemClick }) => {
+  const safeItems = Array.isArray(items) ? items : [];
+
   return (
     <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm w-full">
       <div className="flex justify-between items-center mb-5">
@@ -25,7 +27,7 @@ export const PendingApprovalsCard: React.FC<PendingApprovalsCardProps> = ({ item
         </button>
       </div>
       <div className="space-y-3">
-        {items.map((item, i) => (
+        {safeItems.map((item, i) => (
           <div
             key={i}
             onClick={() => onItemClick?.(i)}
